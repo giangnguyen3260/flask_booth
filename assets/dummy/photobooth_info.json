@@ -1,0 +1,746 @@
+{
+  "framesInfo": [
+    {
+      "frameCd": "FRAME-001",
+      "frameUrl": "http://171.226.153.210:8083/frame/frame_3.png",
+      "frameUrlTempDis": "http://171.226.153.210:8083/frame/frame_temp_dis.png",
+      "framePrice": [
+        {
+          "framePriceCd": "FRAME-PRICE-001-001",
+          "printQuantity": "2",
+          "price": "50000.00",
+          "currency": "VND",
+          "defaultYn": "Y"
+        },
+        {
+          "framePriceCd": "FRAME-PRICE-001-002",
+          "printQuantity": "4",
+          "price": "80000.00",
+          "currency": "VND",
+          "defaultYn": "N"
+        },
+        {
+          "framePriceCd": "FRAME-PRICE-001-003",
+          "printQuantity": "6",
+          "price": "120000.00",
+          "currency": "VND",
+          "defaultYn": "N"
+        }
+      ],
+      "frameSetting": {
+        "numOfPhotos": 5,
+        "timePerShot": 10
+      },
+      "backgroundInfo": [
+        {
+          "bgCateCd": "CATE-001",
+          "bgCateNm": "birthday",
+          "bgCateIcon": "http://171.226.153.210:8083/icon/birthday_icon.png",
+          "background": [
+            {
+              "bgCd": "CATE-BG-CD-001",
+              "bgNm": "background 1",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_1.png"
+            },
+            {
+              "bgCd": "CATE-BG-CD-002",
+              "bgNm": "background 2",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_2.png"
+            },
+            {
+              "bgCd": "CATE-BG-CD-003",
+              "bgNm": "background 3",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_3.png"
+            },
+            {
+              "bgCd": "CATE-BG-CD-004",
+              "bgNm": "background 4",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_4.png"
+            }
+          ]
+        },
+        {
+          "bgCateCd": "CATE-002",
+          "bgCateNm": "wedding",
+          "bgCateIcon": "http://171.226.153.210:8083/icon/wedding_icon.png",
+          "background": [
+            {
+              "bgCd": "CATE-BG-CD-005",
+              "bgNm": "background 5",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_1.png"
+            },
+            {
+              "bgCd": "CATE-BG-CD-006",
+              "bgNm": "background 6",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_2.png"
+            },
+            {
+              "bgCd": "CATE-BG-CD-007",
+              "bgNm": "background 7",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_3.png"
+            },
+            {
+              "bgCd": "CATE-BG-CD-008",
+              "bgNm": "background 8",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_4.png"
+            }
+          ]
+        },
+        {
+          "bgCateCd": "CATE-003",
+          "bgCateNm": "travel",
+          "bgCateIcon": "http://171.226.153.210:8083/icon/travel_icon.png",
+          "background": [
+            {
+              "bgCd": "CATE-BG-CD-009",
+              "bgNm": "background 9",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_1.png"
+            },
+            {
+              "bgCd": "CATE-BG-CD-010",
+              "bgNm": "background 10",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_2.png"
+            },
+            {
+              "bgCd": "CATE-BG-CD-011",
+              "bgNm": "background 11",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_3.png"
+            },
+            {
+              "bgCd": "CATE-BG-CD-012",
+              "bgNm": "background 12",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_4.png"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "frameCd": "FRAME-002",
+      "frameUrl": "http://171.226.153.210:8083/frame/frame_3_nho.png",
+      "frameUrlTempDis": "http://171.226.153.210:8083/frame/frame_temp_dis.png",
+      "framePrice": [
+        {
+          "framePriceCd": "FRAME-PRICE-002-001",
+          "printQuantity": "2",
+          "price": "50000.00",
+          "currency": "VND",
+          "defaultYn": "Y"
+        },
+        {
+          "framePriceCd": "FRAME-PRICE-002-002",
+          "printQuantity": "4",
+          "price": "80000.00",
+          "currency": "VND",
+          "defaultYn": "N"
+        },
+        {
+          "framePriceCd": "FRAME-PRICE-002-003",
+          "printQuantity": "6",
+          "price": "120000.00",
+          "currency": "VND",
+          "defaultYn": "N"
+        }
+      ],
+      "frameSetting": {
+        "numOfPhotos": 5,
+        "timePerShot": 10
+      },
+      "backgroundInfo": [
+        {
+          "bgCateCd": "CATE-001",
+          "bgCateNm": "birthday",
+          "bgCateIcon": "http://171.226.153.210:8083/icon/birthday_icon.png",
+          "background": [
+            {
+              "bgCd": "CATE-BG-CD-001",
+              "bgNm": "background 1",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_1.png"
+            },
+            {
+              "bgCd": "CATE-BG-CD-002",
+              "bgNm": "background 2",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_2.png"
+            },
+            {
+              "bgCd": "CATE-BG-CD-003",
+              "bgNm": "background 3",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_3.png"
+            },
+            {
+              "bgCd": "CATE-BG-CD-004",
+              "bgNm": "background 4",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_4.png"
+            }
+          ]
+        },
+        {
+          "bgCateCd": "CATE-002",
+          "bgCateNm": "wedding",
+          "bgCateIcon": "http://171.226.153.210:8083/icon/wedding_icon.png",
+          "background": [
+            {
+              "bgCd": "CATE-BG-CD-005",
+              "bgNm": "background 5",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_1.png"
+            },
+            {
+              "bgCd": "CATE-BG-CD-006",
+              "bgNm": "background 6",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_2.png"
+            },
+            {
+              "bgCd": "CATE-BG-CD-007",
+              "bgNm": "background 7",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_3.png"
+            },
+            {
+              "bgCd": "CATE-BG-CD-008",
+              "bgNm": "background 8",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_4.png"
+            }
+          ]
+        },
+        {
+          "bgCateCd": "CATE-003",
+          "bgCateNm": "travel",
+          "bgCateIcon": "http://171.226.153.210:8083/icon/travel_icon.png",
+          "background": [
+            {
+              "bgCd": "CATE-BG-CD-009",
+              "bgNm": "background 9",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_1.png"
+            },
+            {
+              "bgCd": "CATE-BG-CD-010",
+              "bgNm": "background 10",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_2.png"
+            },
+            {
+              "bgCd": "CATE-BG-CD-011",
+              "bgNm": "background 11",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_3.png"
+            },
+            {
+              "bgCd": "CATE-BG-CD-012",
+              "bgNm": "background 12",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_4.png"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "frameCd": "FRAME-003",
+      "frameUrl": "http://171.226.153.210:8083/frame/frame_4.png",
+      "frameUrlTempDis": "http://171.226.153.210:8083/frame/frame_temp_dis.png",
+      "framePrice": [
+        {
+          "framePriceCd": "FRAME-PRICE-003-001",
+          "printQuantity": "2",
+          "price": "50000.00",
+          "currency": "VND",
+          "defaultYn": "Y"
+        },
+        {
+          "framePriceCd": "FRAME-PRICE-003-002",
+          "printQuantity": "4",
+          "price": "80000.00",
+          "currency": "VND",
+          "defaultYn": "N"
+        },
+        {
+          "framePriceCd": "FRAME-PRICE-003-003",
+          "printQuantity": "6",
+          "price": "120000.00",
+          "currency": "VND",
+          "defaultYn": "N"
+        }
+      ],
+      "frameSetting": {
+        "numOfPhotos": 8,
+        "timePerShot": 10
+      },
+      "backgroundInfo": [
+        {
+          "bgCateCd": "CATE-001",
+          "bgCateNm": "birthday",
+          "bgCateIcon": "http://171.226.153.210:8083/icon/birthday_icon.png",
+          "background": [
+            {
+              "bgCd": "CATE-BG-CD-001",
+              "bgNm": "background 1",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_1.png"
+            },
+            {
+              "bgCd": "CATE-BG-CD-002",
+              "bgNm": "background 2",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_2.png"
+            },
+            {
+              "bgCd": "CATE-BG-CD-003",
+              "bgNm": "background 3",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_3.png"
+            },
+            {
+              "bgCd": "CATE-BG-CD-004",
+              "bgNm": "background 4",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_4.png"
+            }
+          ]
+        },
+        {
+          "bgCateCd": "CATE-002",
+          "bgCateNm": "wedding",
+          "bgCateIcon": "http://171.226.153.210:8083/icon/wedding_icon.png",
+          "background": [
+            {
+              "bgCd": "CATE-BG-CD-005",
+              "bgNm": "background 5",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_1.png"
+            },
+            {
+              "bgCd": "CATE-BG-CD-006",
+              "bgNm": "background 6",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_2.png"
+            },
+            {
+              "bgCd": "CATE-BG-CD-007",
+              "bgNm": "background 7",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_3.png"
+            },
+            {
+              "bgCd": "CATE-BG-CD-008",
+              "bgNm": "background 8",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_4.png"
+            }
+          ]
+        },
+        {
+          "bgCateCd": "CATE-003",
+          "bgCateNm": "travel",
+          "bgCateIcon": "http://171.226.153.210:8083/icon/travel_icon.png",
+          "background": [
+            {
+              "bgCd": "CATE-BG-CD-009",
+              "bgNm": "background 9",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_1.png"
+            },
+            {
+              "bgCd": "CATE-BG-CD-010",
+              "bgNm": "background 10",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_2.png"
+            },
+            {
+              "bgCd": "CATE-BG-CD-011",
+              "bgNm": "background 11",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_3.png"
+            },
+            {
+              "bgCd": "CATE-BG-CD-012",
+              "bgNm": "background 12",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_4.png"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "frameCd": "FRAME-004",
+      "frameUrl": "http://171.226.153.210:8083/frame/frame_4_nho.png",
+      "frameUrlTempDis": "http://171.226.153.210:8083/frame/frame_temp_dis.png",
+      "framePrice": [
+        {
+          "framePriceCd": "FRAME-PRICE-004-001",
+          "printQuantity": "2",
+          "price": "50000.00",
+          "currency": "VND",
+          "defaultYn": "Y"
+        },
+        {
+          "framePriceCd": "FRAME-PRICE-004-002",
+          "printQuantity": "4",
+          "price": "80000.00",
+          "currency": "VND",
+          "defaultYn": "N"
+        },
+        {
+          "framePriceCd": "FRAME-PRICE-004-003",
+          "printQuantity": "6",
+          "price": "120000.00",
+          "currency": "VND",
+          "defaultYn": "N"
+        }
+      ],
+      "frameSetting": {
+        "numOfPhotos": 8,
+        "timePerShot": 10
+      },
+      "backgroundInfo": [
+        {
+          "bgCateCd": "CATE-001",
+          "bgCateNm": "birthday",
+          "bgCateIcon": "http://171.226.153.210:8083/icon/birthday_icon.png",
+          "background": [
+            {
+              "bgCd": "CATE-BG-CD-001",
+              "bgNm": "background 1",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_1.png"
+            },
+            {
+              "bgCd": "CATE-BG-CD-002",
+              "bgNm": "background 2",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_2.png"
+            },
+            {
+              "bgCd": "CATE-BG-CD-003",
+              "bgNm": "background 3",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_3.png"
+            },
+            {
+              "bgCd": "CATE-BG-CD-004",
+              "bgNm": "background 4",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_4.png"
+            }
+          ]
+        },
+        {
+          "bgCateCd": "CATE-002",
+          "bgCateNm": "wedding",
+          "bgCateIcon": "http://171.226.153.210:8083/icon/wedding_icon.png",
+          "background": [
+            {
+              "bgCd": "CATE-BG-CD-005",
+              "bgNm": "background 5",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_1.png"
+            },
+            {
+              "bgCd": "CATE-BG-CD-006",
+              "bgNm": "background 6",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_2.png"
+            },
+            {
+              "bgCd": "CATE-BG-CD-007",
+              "bgNm": "background 7",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_3.png"
+            },
+            {
+              "bgCd": "CATE-BG-CD-008",
+              "bgNm": "background 8",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_4.png"
+            }
+          ]
+        },
+        {
+          "bgCateCd": "CATE-003",
+          "bgCateNm": "travel",
+          "bgCateIcon": "http://171.226.153.210:8083/icon/travel_icon.png",
+          "background": [
+            {
+              "bgCd": "CATE-BG-CD-009",
+              "bgNm": "background 9",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_1.png"
+            },
+            {
+              "bgCd": "CATE-BG-CD-010",
+              "bgNm": "background 10",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_2.png"
+            },
+            {
+              "bgCd": "CATE-BG-CD-011",
+              "bgNm": "background 11",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_3.png"
+            },
+            {
+              "bgCd": "CATE-BG-CD-012",
+              "bgNm": "background 12",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_4.png"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "frameCd": "FRAME-005",
+      "frameUrl": "http://171.226.153.210:8083/frame/frame_6.png",
+      "frameUrlTempDis": "http://171.226.153.210:8083/frame/frame_temp_dis.png",
+      "framePrice": [
+        {
+          "framePriceCd": "FRAME-PRICE-005-001",
+          "printQuantity": "2",
+          "price": "50000.00",
+          "currency": "VND",
+          "defaultYn": "Y"
+        },
+        {
+          "framePriceCd": "FRAME-PRICE-005-002",
+          "printQuantity": "4",
+          "price": "80000.00",
+          "currency": "VND",
+          "defaultYn": "N"
+        },
+        {
+          "framePriceCd": "FRAME-PRICE-005-003",
+          "printQuantity": "6",
+          "price": "120000.00",
+          "currency": "VND",
+          "defaultYn": "N"
+        }
+      ],
+      "frameSetting": {
+        "numOfPhotos": 10,
+        "timePerShot": 10
+      },
+      "backgroundInfo": [
+        {
+          "bgCateCd": "CATE-001",
+          "bgCateNm": "birthday",
+          "bgCateIcon": "http://171.226.153.210:8083/icon/birthday_icon.png",
+          "background": [
+            {
+              "bgCd": "CATE-BG-CD-001",
+              "bgNm": "background 1",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_1.png"
+            },
+            {
+              "bgCd": "CATE-BG-CD-002",
+              "bgNm": "background 2",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_2.png"
+            },
+            {
+              "bgCd": "CATE-BG-CD-003",
+              "bgNm": "background 3",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_3.png"
+            },
+            {
+              "bgCd": "CATE-BG-CD-004",
+              "bgNm": "background 4",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_4.png"
+            }
+          ]
+        },
+        {
+          "bgCateCd": "CATE-002",
+          "bgCateNm": "wedding",
+          "bgCateIcon": "http://171.226.153.210:8083/icon/wedding_icon.png",
+          "background": [
+            {
+              "bgCd": "CATE-BG-CD-005",
+              "bgNm": "background 5",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_1.png"
+            },
+            {
+              "bgCd": "CATE-BG-CD-006",
+              "bgNm": "background 6",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_2.png"
+            },
+            {
+              "bgCd": "CATE-BG-CD-007",
+              "bgNm": "background 7",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_3.png"
+            },
+            {
+              "bgCd": "CATE-BG-CD-008",
+              "bgNm": "background 8",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_4.png"
+            }
+          ]
+        },
+        {
+          "bgCateCd": "CATE-003",
+          "bgCateNm": "travel",
+          "bgCateIcon": "http://171.226.153.210:8083/icon/travel_icon.png",
+          "background": [
+            {
+              "bgCd": "CATE-BG-CD-009",
+              "bgNm": "background 9",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_1.png"
+            },
+            {
+              "bgCd": "CATE-BG-CD-010",
+              "bgNm": "background 10",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_2.png"
+            },
+            {
+              "bgCd": "CATE-BG-CD-011",
+              "bgNm": "background 11",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_3.png"
+            },
+            {
+              "bgCd": "CATE-BG-CD-012",
+              "bgNm": "background 12",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_4.png"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "frameCd": "FRAME-006",
+      "frameUrl": "http://171.226.153.210:8083/frame/frame_6_border.png",
+      "frameUrlTempDis": "http://171.226.153.210:8083/frame/frame_temp_dis.png",
+      "framePrice": [
+        {
+          "framePriceCd": "FRAME-PRICE-000065-001",
+          "printQuantity": "2",
+          "price": "50000.00",
+          "currency": "VND",
+          "defaultYn": "Y"
+        },
+        {
+          "framePriceCd": "FRAME-PRICE-006-002",
+          "printQuantity": "4",
+          "price": "80000.00",
+          "currency": "VND",
+          "defaultYn": "N"
+        },
+        {
+          "framePriceCd": "FRAME-PRICE-006-003",
+          "printQuantity": "6",
+          "price": "120000.00",
+          "currency": "VND",
+          "defaultYn": "N"
+        }
+      ],
+      "frameSetting": {
+        "numOfPhotos": 10,
+        "timePerShot": 10
+      },
+      "backgroundInfo": [
+        {
+          "bgCateCd": "CATE-001",
+          "bgCateNm": "birthday",
+          "bgCateIcon": "http://171.226.153.210:8083/icon/birthday_icon.png",
+          "background": [
+            {
+              "bgCd": "CATE-BG-CD-001",
+              "bgNm": "background 1",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_1.png"
+            },
+            {
+              "bgCd": "CATE-BG-CD-002",
+              "bgNm": "background 2",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_2.png"
+            },
+            {
+              "bgCd": "CATE-BG-CD-003",
+              "bgNm": "background 3",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_3.png"
+            },
+            {
+              "bgCd": "CATE-BG-CD-004",
+              "bgNm": "background 4",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_4.png"
+            }
+          ]
+        },
+        {
+          "bgCateCd": "CATE-002",
+          "bgCateNm": "wedding",
+          "bgCateIcon": "http://171.226.153.210:8083/icon/wedding_icon.png",
+          "background": [
+            {
+              "bgCd": "CATE-BG-CD-005",
+              "bgNm": "background 5",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_1.png"
+            },
+            {
+              "bgCd": "CATE-BG-CD-006",
+              "bgNm": "background 6",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_2.png"
+            },
+            {
+              "bgCd": "CATE-BG-CD-007",
+              "bgNm": "background 7",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_3.png"
+            },
+            {
+              "bgCd": "CATE-BG-CD-008",
+              "bgNm": "background 8",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_4.png"
+            }
+          ]
+        },
+        {
+          "bgCateCd": "CATE-003",
+          "bgCateNm": "travel",
+          "bgCateIcon": "http://171.226.153.210:8083/icon/travel_icon.png",
+          "background": [
+            {
+              "bgCd": "CATE-BG-CD-009",
+              "bgNm": "background 9",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_1.png"
+            },
+            {
+              "bgCd": "CATE-BG-CD-010",
+              "bgNm": "background 10",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_2.png"
+            },
+            {
+              "bgCd": "CATE-BG-CD-011",
+              "bgNm": "background 11",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_3.png"
+            },
+            {
+              "bgCd": "CATE-BG-CD-012",
+              "bgNm": "background 12",
+              "bgUrl": "http://171.226.153.210:8083/bg/bg_4.png"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "configInfo": {
+    "timer": [
+      {
+        "screenIndex": 1,
+        "screenCd": "TAP-TO-START",
+        "nextScreenCd": "LAYOUT-SELECT",
+        "value": 30
+      },
+      {
+        "screenIndex": 2,
+        "screenCd": "LAYOUT-SELECT",
+        "nextScreenCd": "NUMBER-PRINTER",
+        "value": 30
+      },
+      {
+        "screenIndex": 3,
+        "screenCd": "NUMBER-PRINTER",
+        "nextScreenCd": "PAYMENT",
+        "value": 30
+      },
+      {
+        "screenIndex": 4,
+        "screen_cd": "PAYMENT",
+        "nextScreenCd": "USER_GUIDE",
+        "value": 30
+      },
+      {
+        "screenIndex": 5,
+        "screenCd": "USER_GUIDE",
+        "nextScreenCd": "TAKE-PHOTOS",
+        "value": 30
+      },
+      {
+        "screenIndex": 5,
+        "screenCd": "TAKE-PHOTOS",
+        "nextScreenCd": "SELECT-PHOTOS",
+        "value": 30
+      },
+      {
+        "screenIndex": 6,
+        "screenCd": "SELECT-PHOTOS",
+        "nextScreenCd": "PHOTO-SETTING",
+        "value": 30
+      },
+      {
+        "screenIndex": 7,
+        "screenCd": "COMPLETE",
+        "nextScreenCd": "END",
+        "value": 30
+      }
+    ]
+  }
+}

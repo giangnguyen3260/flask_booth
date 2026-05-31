@@ -1,0 +1,4 @@
+enum PrinterCutMode {
+  standard,
+  twoInch,
+}

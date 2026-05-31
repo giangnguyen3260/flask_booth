@@ -1,0 +1,961 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stormick Photo Booth — v2</title>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,600;1,700;1,800;1,900&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{width:100%;height:100%;background:#0a0a0f;overflow:hidden;display:flex;align-items:center;justify-content:center;}
+#stage{position:absolute;width:1920px;height:1080px;transform-origin:top left;}
+.screen{position:absolute;inset:0;width:1920px;height:1080px;font-family:'Be Vietnam Pro',sans-serif;overflow:hidden;background:#ECEAE3;}
+button{font-family:'Be Vietnam Pro',sans-serif;}
+@keyframes slideInRight{from{opacity:0;transform:translateX(40px)}to{opacity:1;transform:translateX(0)}}
+@keyframes slideInLeft{from{opacity:0;transform:translateX(-40px)}to{opacity:1;transform:translateX(0)}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes popIn{0%{transform:scale(.55);opacity:0}60%{transform:scale(1.06)}100%{transform:scale(1);opacity:1}}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+@keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-10px)}40%,80%{transform:translateX(10px)}}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect,useRef,useCallback,createContext,useContext} = React;
+
+// ── CONSTANTS ──────────────────────────────────────────────────
+const N='#1B1A38', C='#ECEAE3', W=1920, H=1080;
+const IDLE_WARN_AT=50, IDLE_RESET_AT=60;
+
+// ── LANGUAGE ───────────────────────────────────────────────────
+const TXT={
+  vi:{
+    tap:'TAP TO START', selFrame:'Vui lòng chọn khung ảnh', selFrameS:'Select frame',
+    selCount:'Vui lòng chọn số lượng ảnh', selCountS:'Select number of photos',
+    orderTitle:'Xác nhận đơn hàng', orderSub:'Order Summary',
+    frame:'Khung', prints:'Số bản in', basePrice:'Giá cơ bản', extraPrint:'bản in thêm',
+    total:'Tổng cộng', confirm:'Xác nhận', edit:'Sửa lại',
+    payment:'Thanh toán', cash:'Tiền mặt', qr:'QR / Chuyển khoản',
+    amtDue:'Số tiền cần thanh toán', amtIn:'Số tiền đã nộp',
+    insertCash:'Vui lòng bỏ tiền vào máy', payOK:'✓ Thanh toán thành công!',
+    voucher:'Bạn có voucher không?', voucherS:'Do you have a voucher?',
+    qrHint:'Quét mã QR để thanh toán', qrBank:'Ngân hàng: MB Bank',
+    qrAcc:'Số tài khoản: 0123 4567 89', qrDone:'Tôi đã chuyển khoản xong',
+    readyGo:'READY GO!', shots:'Số lần chụp', timeShot:'Thời gian / lần',
+    autoCapt:'Tự động chụp khi vượt quá số giây', getReady:'Chuẩn bị chụp',
+    lookLens:'Nhìn vào ống kính và nhấn nút chụp',
+    selPhoto:'Vui lòng chọn ảnh', selPhotoS:'Select Photo (Duplicate OK)',
+    retake:'Chụp lại', selFilter:'Chọn filter', selFilterS:'Select Filter',
+    selBg:'Chọn nền', selBgS:'Select Background',
+    brightness:'Độ sáng', brightS:'Brightness',
+    grayscale:'Đen trắng', grayS:'Gray-scale',
+    flipH:'Lật ngang', flipHS:'Flip Horizontal',
+    stickerTab:'Sticker & Chữ', stickerHint:'Nhấn để thêm vào ảnh',
+    clearAll:'Xoá tất cả', print:'In ảnh',
+    printing:'Đang in ảnh…', printDone:'In xong rồi! 🎉',
+    scanDL:'Tải ảnh về điện thoại', end:'Kết thúc',
+    prev:'Trước', next:'Sau',
+    idleQ:'Bạn còn ở đó không?', idleS:'Phiên sẽ kết thúc sau', idleSec:'giây',
+    idleBtn:'Tiếp tục',
+  },
+  en:{
+    tap:'TAP TO START', selFrame:'Please select a frame', selFrameS:'Chọn khung ảnh',
+    selCount:'Select number of photos', selCountS:'Vui lòng chọn số lượng',
+    orderTitle:'Order Summary', orderSub:'Xác nhận đơn hàng',
+    frame:'Frame', prints:'Prints', basePrice:'Base price', extraPrint:'extra prints',
+    total:'Total', confirm:'Confirm', edit:'Edit',
+    payment:'Payment', cash:'Cash', qr:'QR / Transfer',
+    amtDue:'Amount due', amtIn:'Amount inserted',
+    insertCash:'Please insert cash into machine', payOK:'✓ Payment successful!',
+    voucher:'Do you have a voucher?', voucherS:'Bạn có voucher không?',
+    qrHint:'Scan QR code to pay', qrBank:'Bank: MB Bank',
+    qrAcc:'Account: 0123 4567 89', qrDone:'I have completed the transfer',
+    readyGo:'READY GO!', shots:'Shots', timeShot:'Time per shot',
+    autoCapt:'Auto capture when time exceeds', getReady:'Get ready',
+    lookLens:'Look at the lens and press the shutter',
+    selPhoto:'Please select photos', selPhotoS:'Vui lòng chọn ảnh',
+    retake:'Retake', selFilter:'Select Filter', selFilterS:'Chọn filter',
+    selBg:'Select Background', selBgS:'Chọn nền',
+    brightness:'Brightness', brightS:'Độ sáng',
+    grayscale:'Grayscale', grayS:'Đen trắng',
+    flipH:'Flip Horizontal', flipHS:'Lật ngang',
+    stickerTab:'Stickers & Text', stickerHint:'Tap to add to photo',
+    clearAll:'Clear all', print:'Print',
+    printing:'Printing…', printDone:'Print done! 🎉',
+    scanDL:'Download photos to phone', end:'End',
+    prev:'Prev', next:'Next',
+    idleQ:'Are you still there?', idleS:'Session ends in', idleSec:'seconds',
+    idleBtn:'Continue',
+  }
+};
+
+const LangCtx=createContext('vi');
+const useLang=()=>{ const l=useContext(LangCtx); return k=>TXT[l][k]||TXT.vi[k]||k; };
+
+// ── SHARED ATOMS ───────────────────────────────────────────────
+const Grain=()=>(
+  <svg style={{position:'absolute',inset:0,width:'100%',height:'100%',opacity:.09,pointerEvents:'none',zIndex:15}} xmlns="http://www.w3.org/2000/svg">
+    <filter id="gf"><feTurbulence type="fractalNoise" baseFrequency="0.72" numOctaves="4" stitchTiles="stitch"/></filter>
+    <rect width="100%" height="100%" filter="url(#gf)"/>
+  </svg>
+);
+const Stars=({x,y,size=80,flip=false})=>(
+  <div style={{position:'absolute',left:x,top:y,pointerEvents:'none',zIndex:4,transform:flip?'scaleX(-1)':'none'}}>
+    <svg width={size} height={size} viewBox="0 0 80 80" fill="none">
+      <path d="M36 2 L39.5 32.5 L70 36 L39.5 39.5 L36 70 L32.5 39.5 L2 36 L32.5 32.5 Z" fill={N}/>
+      <path d="M66 6 L67.4 10.6 L72 12 L67.4 13.4 L66 18 L64.6 13.4 L60 12 L64.6 10.6 Z" fill={N}/>
+    </svg>
+  </div>
+);
+const BracketTL=()=>(
+  <svg style={{position:'absolute',top:0,left:0,pointerEvents:'none',zIndex:5}} width="220" height="200" viewBox="0 0 220 200">
+    <rect x="14" y="14" width="130" height="8" fill={N} rx="2"/><rect x="14" y="14" width="8" height="130" fill={N} rx="2"/>
+    <rect x="28" y="28" width="85" height="5" fill={N} rx="1"/><rect x="28" y="28" width="5" height="85" fill={N} rx="1"/>
+    <rect x="14" y="36" width="14" height="5" fill={C}/><rect x="36" y="14" width="5" height="14" fill={C}/>
+  </svg>
+);
+const BracketBR=()=>(
+  <svg style={{position:'absolute',bottom:0,right:0,pointerEvents:'none',zIndex:5}} width="220" height="200" viewBox="0 0 220 200">
+    <rect x="76" y="178" width="130" height="8" fill={N} rx="2"/><rect x="198" y="58" width="8" height="130" fill={N} rx="2"/>
+    <rect x="107" y="167" width="85" height="5" fill={N} rx="1"/><rect x="187" y="87" width="5" height="85" fill={N} rx="1"/>
+    <rect x="187" y="167" width="16" height="5" fill={C}/><rect x="107" y="167" width="5" height="16" fill={C}/>
+  </svg>
+);
+const DiagAccents=()=>(
+  <div style={{position:'absolute',inset:0,overflow:'hidden',pointerEvents:'none',zIndex:3}}>
+    <div style={{position:'absolute',top:-24,right:-100,width:580,height:52,background:N,transform:'rotate(-18deg)'}}/>
+    <div style={{position:'absolute',top:38,right:-130,width:560,height:18,background:N,transform:'rotate(-18deg)',opacity:.85}}/>
+    <div style={{position:'absolute',bottom:-18,left:-100,width:1300,height:28,background:N,transform:'rotate(-2.5deg)'}}/>
+    <div style={{position:'absolute',bottom:16,left:-100,width:1000,height:14,background:N,transform:'rotate(-2.5deg)',opacity:.7}}/>
+  </div>
+);
+const NavBtn=({label,sub,onClick,side='left',disabled=false})=>(
+  <div onClick={disabled?null:onClick} style={{position:'absolute',bottom:44,[side]:64,width:112,height:112,borderRadius:'50%',background:disabled?'rgba(27,26,56,.22)':N,cursor:disabled?'default':'pointer',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',zIndex:20,userSelect:'none',transition:'opacity .2s'}}>
+    <span style={{color:'#fff',fontWeight:800,fontSize:20,lineHeight:1}}>{label}</span>
+    <span style={{color:'rgba(255,255,255,.5)',fontSize:13,marginTop:2}}>{sub}</span>
+  </div>
+);
+const STEPS=['Khung','Số lượng','Xác nhận','Thanh toán','Ready!','Chụp','Chọn ảnh','Filter & Sticker','In ảnh'];
+const StepBar=({cur})=>(
+  <div style={{position:'absolute',top:0,left:0,right:0,height:7,display:'flex',gap:3,zIndex:25}}>
+    {STEPS.map((s,i)=><div key={i} style={{flex:1,height:'100%',background:i<=cur?N:'rgba(27,26,56,.18)',borderRadius:'0 0 3px 3px',transition:'background .5s'}}/>)}
+  </div>
+);
+const fmt=n=>n.toLocaleString('vi-VN')+'đ';
+
+// ── LANG TOGGLE ────────────────────────────────────────────────
+const LangToggle=({lang,setLang})=>(
+  <div style={{position:'absolute',top:28,right:32,zIndex:30,display:'flex',background:'rgba(27,26,56,.1)',borderRadius:40,padding:4}}>
+    {['vi','en'].map(l=>(
+      <div key={l} onClick={()=>setLang(l)} style={{padding:'10px 26px',borderRadius:36,fontSize:20,fontWeight:800,background:lang===l?N:'transparent',color:lang===l?'#fff':N,cursor:lang===l?'default':'pointer',transition:'all .22s',userSelect:'none',letterSpacing:1}}>{l.toUpperCase()}</div>
+    ))}
+  </div>
+);
+
+// ── IDLE OVERLAY ───────────────────────────────────────────────
+const IdleOverlay=({remaining,onContinue})=>{
+  const t=useLang();
+  return (
+    <div style={{position:'absolute',inset:0,background:'rgba(7,7,20,.88)',zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',animation:'fadeIn .4s'}}>
+      <div style={{background:C,borderRadius:28,padding:'72px 110px',textAlign:'center',boxShadow:'0 32px 100px rgba(0,0,0,.6)'}}>
+        <div style={{fontSize:100,marginBottom:16}}>⏰</div>
+        <div style={{fontWeight:900,fontSize:60,color:N,lineHeight:1.1}}>{t('idleQ')}</div>
+        <div style={{fontSize:28,color:N,opacity:.4,marginTop:10}}>Are you still there?</div>
+        <div key={remaining} style={{fontSize:120,fontWeight:900,color:N,lineHeight:1,marginTop:32,animation:'popIn .35s ease-out'}}>{remaining}</div>
+        <div style={{fontSize:28,color:N,opacity:.45}}>{t('idleSec')}</div>
+        <button onClick={onContinue} style={{marginTop:40,padding:'22px 96px',background:N,border:'none',borderRadius:14,fontSize:34,fontWeight:700,color:'#fff',cursor:'pointer',fontFamily:'Be Vietnam Pro',boxShadow:'0 6px 28px rgba(27,26,56,.35)'}}>{t('idleBtn')}</button>
+      </div>
+    </div>
+  );
+};
+
+// ── SCREEN TRANSITION WRAPPER ──────────────────────────────────
+const ScreenWrap=({screenKey,dir,children})=>(
+  <div key={screenKey} style={{position:'absolute',inset:0,animation:`${dir==='right'?'slideInRight':'slideInLeft'} 0.3s cubic-bezier(.22,1,.36,1)`}}>
+    {children}
+  </div>
+);
+
+// ── FRAME DATA ─────────────────────────────────────────────────
+const FRAMES=[
+  {id:1,label:'2-Strip',slots:2,price:70000},{id:2,label:'3-Strip',slots:3,price:100000},
+  {id:3,label:'4-Grid',slots:4,price:100000},{id:4,label:'4-Strip',slots:4,price:100000},
+  {id:5,label:'Mixed',slots:3,price:100000},{id:6,label:'2-Wide',slots:2,price:100000},
+];
+const ph={fill:'#D0CEC8',rx:'3'};
+const FrameSVG=({id,sel})=>{
+  const brd={fill:'#fff',stroke:sel?N:'#D8D5CF',strokeWidth:sel?5:2};
+  if(id===1) return <svg width="110" height="170" viewBox="0 0 110 170"><rect width="110" height="170" {...brd} rx="4"/><rect x="8" y="8" width="94" height="72" {...ph}/><rect x="8" y="90" width="94" height="72" {...ph}/></svg>;
+  if(id===2) return <svg width="100" height="190" viewBox="0 0 100 190"><rect width="100" height="190" {...brd} rx="4"/><rect x="7" y="7" width="86" height="54" {...ph}/><rect x="7" y="69" width="86" height="54" {...ph}/><rect x="7" y="131" width="86" height="52" {...ph}/></svg>;
+  if(id===3) return <svg width="170" height="170" viewBox="0 0 170 170"><rect width="170" height="170" {...brd} rx="4"/><rect x="8" y="8" width="72" height="72" {...ph}/><rect x="90" y="8" width="72" height="72" {...ph}/><rect x="8" y="90" width="72" height="72" {...ph}/><rect x="90" y="90" width="72" height="72" {...ph}/></svg>;
+  if(id===4) return <svg width="80" height="210" viewBox="0 0 80 210"><rect width="80" height="210" {...brd} rx="4"/><rect x="7" y="7" width="66" height="42" {...ph}/><rect x="7" y="57" width="66" height="42" {...ph}/><rect x="7" y="107" width="66" height="42" {...ph}/><rect x="7" y="157" width="66" height="46" {...ph}/></svg>;
+  if(id===5) return <svg width="170" height="130" viewBox="0 0 170 130"><rect width="170" height="130" {...brd} rx="4"/><rect x="8" y="8" width="90" height="114" {...ph}/><rect x="108" y="8" width="54" height="52" {...ph}/><rect x="108" y="70" width="54" height="52" {...ph}/></svg>;
+  if(id===6) return <svg width="200" height="130" viewBox="0 0 200 130"><rect width="200" height="130" {...brd} rx="4"/><rect x="8" y="8" width="184" height="50" {...ph}/><rect x="8" y="68" width="184" height="54" {...ph}/></svg>;
+  return null;
+};
+const FrameCard=({frame,selected,onClick})=>(
+  <div onClick={onClick} style={{display:'flex',flexDirection:'column',alignItems:'center',gap:18,cursor:'pointer',padding:'28px 24px',borderRadius:16,background:selected?'rgba(27,26,56,.07)':'transparent',outline:selected?`3px solid ${N}`:'3px solid transparent',transition:'all .2s',userSelect:'none'}}>
+    <FrameSVG id={frame.id} sel={selected}/>
+    <div style={{fontWeight:800,fontSize:24,color:N}}>{frame.price.toLocaleString('vi-VN')}</div>
+  </div>
+);
+
+const PHOTOS=[
+  'linear-gradient(140deg,#667eea,#764ba2)','linear-gradient(140deg,#f093fb,#f5576c)',
+  'linear-gradient(140deg,#4facfe,#00f2fe)','linear-gradient(140deg,#43e97b,#38f9d7)',
+  'linear-gradient(140deg,#fa709a,#fee140)','linear-gradient(140deg,#a18cd1,#fbc2eb)',
+  'linear-gradient(140deg,#ffecd2,#fcb69f)','linear-gradient(140deg,#a1c4fd,#c2e9fb)',
+  'linear-gradient(140deg,#fd79a8,#c44569)','linear-gradient(140deg,#2d3436,#636e72)',
+];
+
+// ── COUPON OVERLAY ─────────────────────────────────────────────
+const COUPONS={'STORMICK10':{type:'percent',value:10,label:'Giảm 10%'},'BEOBEO':{type:'fixed',value:20000,label:'Giảm 20.000đ'},'VIP50K':{type:'fixed',value:50000,label:'Giảm 50.000đ'},'STORMICK20':{type:'percent',value:20,label:'Giảm 20%'}};
+const CouponOverlay=({baseTotal,onApply,onClose})=>{
+  const t=useLang();
+  const [code,setCode]=useState('');
+  const [status,setStatus]=useState('idle');
+  const [result,setResult]=useState(null);
+  const verify=()=>{
+    if(!code.trim()||status==='checking') return;
+    setStatus('checking');
+    setTimeout(()=>{
+      const found=COUPONS[code.trim().toUpperCase()];
+      if(found){
+        const amt=found.type==='percent'?Math.round(baseTotal*found.value/100):found.value;
+        const r={...found,code:code.trim().toUpperCase(),discountAmt:amt};
+        setResult(r);setStatus('valid');
+        setTimeout(()=>onApply(r),1200);
+      } else { setStatus('invalid'); }
+    },1100);
+  };
+  const keys=['1','2','3','4','5','6','7','8','9','0','Q','W','E','R','T','Y','U','I','O','P','A','S','D','F','G','H','J','K','L','Z','X','C','V','B','N','M','⌫','CLEAR'];
+  const handleKey=k=>{
+    if(k==='⌫'){setCode(c=>c.slice(0,-1));setStatus('idle');}
+    else if(k==='CLEAR'){setCode('');setStatus('idle');}
+    else if(code.length<12){setCode(c=>c+k);setStatus('idle');}
+  };
+  const sColor=status==='valid'?'#1E7A45':status==='invalid'?'#D32F2F':N;
+  const sMsg=status==='checking'?'Đang kiểm tra…':status==='valid'?`✓ Áp dụng thành công! Giảm ${result?fmt(result.discountAmt):''}`:status==='invalid'?'❌ Mã không hợp lệ. Thử lại!':'';
+  return (
+    <div style={{position:'absolute',inset:0,background:'rgba(7,7,20,.75)',zIndex:50,display:'flex',alignItems:'center',justifyContent:'center'}}>
+      <div style={{background:C,borderRadius:24,padding:'52px 64px 48px',width:900,position:'relative',boxShadow:'0 24px 80px rgba(0,0,0,.5)'}}>
+        <div onClick={onClose} style={{position:'absolute',top:28,right:36,width:52,height:52,borderRadius:'50%',border:`2.5px solid ${N}`,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',fontSize:22,color:N,fontWeight:700}}>✕</div>
+        <div style={{fontWeight:800,fontSize:50,color:N}}>{t('voucher')}</div>
+        <div style={{fontStyle:'italic',fontSize:22,color:N,opacity:.4,marginTop:6,marginBottom:36}}>{t('voucherS')}</div>
+        <div style={{width:'100%',padding:'18px 28px',border:`3px solid ${status==='valid'?'#1E7A45':status==='invalid'?'#D32F2F':N}`,borderRadius:12,fontSize:42,fontWeight:900,color:N,letterSpacing:8,minHeight:82,background:'rgba(27,26,56,.04)',transition:'border-color .3s',display:'flex',alignItems:'center',animation:status==='invalid'?'shake .4s':undefined}}>
+          {code||<span style={{opacity:.25,fontSize:28,fontWeight:400,letterSpacing:2}}>Nhập mã voucher…</span>}
+          {(status==='idle'||status==='invalid')&&code.length>0&&<span style={{display:'inline-block',width:2,height:44,background:N,animation:'blink 1s step-end infinite',marginLeft:6}}/>}
+        </div>
+        <div style={{minHeight:36,marginTop:12,fontSize:22,fontWeight:600,color:sColor,transition:'color .3s'}}>{sMsg}</div>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(10,1fr)',gap:8,marginTop:20}}>
+          {keys.map(k=>(
+            <div key={k} onClick={()=>handleKey(k)} style={{height:58,borderRadius:8,display:'flex',alignItems:'center',justifyContent:'center',background:k==='⌫'||k==='CLEAR'?'rgba(27,26,56,.12)':'rgba(27,26,56,.07)',border:'1.5px solid rgba(27,26,56,.15)',cursor:'pointer',fontSize:k==='CLEAR'?14:20,fontWeight:700,color:N,gridColumn:k==='CLEAR'?'span 2':undefined,userSelect:'none'}}>{k}</div>
+          ))}
+        </div>
+        <button onClick={verify} disabled={!code||status==='checking'||status==='valid'} style={{marginTop:28,width:'100%',padding:'20px',background:status==='valid'?'#1E7A45':N,border:'none',borderRadius:12,fontSize:26,fontWeight:700,color:'#fff',cursor:(!code||status!=='idle')?'default':'pointer',opacity:!code?.6:1,transition:'all .3s',fontFamily:'Be Vietnam Pro'}}>
+          {status==='checking'?'Đang kiểm tra…':status==='valid'?'✓ Thành công!':'Xác nhận / Verify'}
+        </button>
+        <div style={{marginTop:14,fontSize:15,color:N,opacity:.3,textAlign:'center'}}>Gợi ý: STORMICK10 · BEOBEO · VIP50K · STORMICK20</div>
+      </div>
+    </div>
+  );
+};
+
+// ══════════════════════════════════════════════════════════════
+// SCREENS
+// ══════════════════════════════════════════════════════════════
+
+// 1. SPLASH
+const SplashScreen=({onNext,lang,setLang})=>(
+  <div className="screen" onClick={onNext} style={{cursor:'pointer',userSelect:'none'}}>
+    <Grain/><DiagAccents/><BracketTL/>
+    <Stars x={155} y={82}/><Stars x={1630} y={65} flip/><Stars x={220} y={700} size={90}/>
+    <LangToggle lang={lang} setLang={setLang}/>
+    <div style={{position:'absolute',inset:0,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',zIndex:10}}>
+      <svg width="230" height="210" viewBox="0 0 230 210" fill="none">
+        <ellipse cx="115" cy="168" rx="92" ry="24" stroke={N} strokeWidth="2.5" fill="none"/>
+        <path d="M75,165 Q73,108 82,86 Q94,58 115,56 Q136,58 148,86 Q157,108 155,165 Q136,182 115,182 Q94,182 75,165Z" fill={N}/>
+        <ellipse cx="115" cy="70" rx="50" ry="48" fill={N}/>
+        <path d="M72,45 L64,14 L94,38" fill={N}/><path d="M158,45 L166,14 L136,38" fill={N}/>
+      </svg>
+      <div style={{fontWeight:900,fontSize:112,color:N,letterSpacing:-5,lineHeight:1,marginTop:-8}}>stormick</div>
+      <div style={{display:'flex',alignItems:'baseline',gap:14,marginTop:40,letterSpacing:7}}>
+        <span style={{fontWeight:600,fontStyle:'italic',fontSize:42,color:N}}>TAP TO</span>
+        <span style={{fontWeight:900,fontSize:48,color:N}}>START</span>
+      </div>
+    </div>
+  </div>
+);
+
+// 2. FRAME SELECT
+const FrameSelectScreen=({onNext,onPrev,selFrame,setSelFrame,lang,setLang})=>{
+  const t=useLang();
+  return (
+    <div className="screen">
+      <Grain/><BracketTL/><BracketBR/><StepBar cur={0}/>
+      <LangToggle lang={lang} setLang={setLang}/>
+      <div style={{position:'absolute',top:88,left:110,zIndex:10}}>
+        <div style={{fontWeight:800,fontSize:60,color:N,lineHeight:1.1}}>{t('selFrame')}</div>
+        <div style={{fontStyle:'italic',fontSize:28,color:N,opacity:.45,marginTop:6}}>{t('selFrameS')}</div>
+      </div>
+      <div style={{position:'absolute',top:230,left:80,right:160,display:'flex',flexWrap:'wrap',gap:20,alignItems:'flex-end',zIndex:10}}>
+        {FRAMES.map(f=><FrameCard key={f.id} frame={f} selected={selFrame?.id===f.id} onClick={()=>setSelFrame(f)}/>)}
+      </div>
+      {selFrame&&(
+        <div onClick={onNext} style={{position:'absolute',right:72,top:'50%',transform:'translateY(-50%)',width:88,height:88,borderRadius:'50%',background:N,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',zIndex:20,boxShadow:'0 8px 32px rgba(27,26,56,.35)'}}>
+          <svg width="30" height="30" viewBox="0 0 30 30" fill="none"><path d="M9 5 L21 15 L9 25" stroke="#fff" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+        </div>
+      )}
+      <NavBtn label={t('prev')} sub="Before" onClick={onPrev} side="left"/>
+    </div>
+  );
+};
+
+// 3. PHOTO COUNT
+const PhotoCountScreen=({onNext,onPrev,count,setCount,framePrice,lang,setLang})=>{
+  const t=useLang();
+  const price=framePrice+Math.max(0,count-1)*40000;
+  return (
+    <div className="screen">
+      <Grain/><StepBar cur={1}/>
+      <Stars x={1640} y={55} size={88} flip/><Stars x={110} y={740} size={80}/>
+      <LangToggle lang={lang} setLang={setLang}/>
+      <div style={{position:'absolute',inset:0,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:52,zIndex:10}}>
+        <div style={{textAlign:'center'}}>
+          <div style={{fontWeight:800,fontSize:60,color:N,lineHeight:1.1}}>{t('selCount')}</div>
+          <div style={{fontStyle:'italic',fontSize:28,color:N,opacity:.45,marginTop:6}}>{t('selCountS')}</div>
+        </div>
+        <div style={{display:'flex',alignItems:'center',gap:64}}>
+          <div onClick={()=>setCount(c=>Math.max(1,c-1))} style={{width:96,height:96,borderRadius:'50%',border:`3.5px solid ${N}`,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',transition:'all .15s'}}>
+            <span style={{fontSize:52,color:N,lineHeight:1,marginTop:-4}}>−</span>
+          </div>
+          <div style={{width:192,height:192,borderRadius:'50%',background:N,display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 8px 40px rgba(27,26,56,.3)'}}>
+            <span style={{fontSize:100,fontWeight:900,color:'#fff',lineHeight:1}}>{count}</span>
+          </div>
+          <div onClick={()=>setCount(c=>Math.min(5,c+1))} style={{width:96,height:96,borderRadius:'50%',border:`3.5px solid ${N}`,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',transition:'all .15s'}}>
+            <span style={{fontSize:52,color:N,lineHeight:1,marginTop:-4}}>+</span>
+          </div>
+        </div>
+        <div style={{background:N,borderRadius:10,padding:'18px 72px',boxShadow:'0 4px 24px rgba(27,26,56,.25)'}}>
+          <span style={{fontSize:46,fontWeight:800,color:'#fff'}}>{fmt(price)}</span>
+        </div>
+        <div style={{fontSize:20,color:N,opacity:.4,textAlign:'center'}}>
+          {t('basePrice')} {fmt(framePrice)}{count>1?` + ${count-1} ${t('extraPrint')} (${fmt(40000)}/bản)`:''}
+        </div>
+      </div>
+      <NavBtn label={t('prev')} sub="Before" onClick={onPrev} side="left"/>
+      <NavBtn label={t('next')} sub="After" onClick={onNext} side="right"/>
+    </div>
+  );
+};
+
+// 4. ORDER SUMMARY (NEW)
+const OrderSummaryScreen=({onNext,onPrev,frame,count,lang,setLang})=>{
+  const t=useLang();
+  const base=frame?.price||70000;
+  const extra=Math.max(0,count-1)*40000;
+  const total=base+extra;
+  const rows=[
+    {label:t('frame'),val:frame?.label||'—'},
+    {label:t('prints'),val:`${count} bản`},
+    {label:t('basePrice'),val:fmt(base)},
+    ...(extra>0?[{label:`${t('extraPrint')} (${count-1}×${fmt(40000)})`,val:fmt(extra)}]:[]),
+  ];
+  return (
+    <div className="screen">
+      <Grain/><BracketTL/><StepBar cur={2}/>
+      <Stars x={1640} y={55} size={80} flip/>
+      <LangToggle lang={lang} setLang={setLang}/>
+      <div style={{position:'absolute',top:88,left:110,zIndex:10}}>
+        <div style={{fontWeight:800,fontSize:60,color:N,lineHeight:1.1}}>{t('orderTitle')}</div>
+        <div style={{fontStyle:'italic',fontSize:28,color:N,opacity:.45,marginTop:6}}>{t('orderSub')}</div>
+      </div>
+      <div style={{position:'absolute',top:'50%',left:'50%',transform:'translate(-50%,-48%)',zIndex:10,display:'flex',gap:100,alignItems:'center'}}>
+        {/* Frame preview */}
+        <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:24}}>
+          <div style={{background:'#fff',padding:28,borderRadius:18,boxShadow:'0 8px 40px rgba(27,26,56,.12)'}}>
+            <FrameSVG id={frame?.id||1} sel={true}/>
+          </div>
+          <div style={{fontWeight:700,fontSize:28,color:N,opacity:.5}}>{frame?.label}</div>
+        </div>
+        {/* Details */}
+        <div style={{display:'flex',flexDirection:'column',gap:0,minWidth:580}}>
+          {rows.map(({label,val},i)=>(
+            <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',padding:'22px 0',borderBottom:'1.5px solid rgba(27,26,56,.1)'}}>
+              <span style={{fontSize:28,fontWeight:500,color:N,opacity:.6}}>{label}</span>
+              <span style={{fontSize:30,fontWeight:700,color:N}}>{val}</span>
+            </div>
+          ))}
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',background:N,borderRadius:14,padding:'26px 36px',marginTop:20}}>
+            <span style={{fontSize:32,fontWeight:700,color:'#fff'}}>{t('total')}</span>
+            <span style={{fontSize:52,fontWeight:900,color:'#fff'}}>{fmt(total)}</span>
+          </div>
+        </div>
+      </div>
+      <NavBtn label={t('edit')} sub="Edit" onClick={onPrev} side="left"/>
+      <NavBtn label={t('confirm')} sub="Pay" onClick={onNext} side="right"/>
+    </div>
+  );
+};
+
+// 5. PAYMENT — Cash + QR tabs
+const QRTab=({netTotal,onPaid,t})=>{
+  const [done,setDone]=useState(false);
+  const ref=Math.floor(Math.random()*90000+10000);
+  const qrSeed=[[1,1,1,0,1,1,1],[1,0,1,0,1,0,1],[1,0,1,0,1,0,1],[0,0,0,0,0,0,0],[1,0,1,0,1,1,1],[1,0,0,0,0,0,1],[1,1,1,0,1,1,1]];
+  const cells=[];
+  for(let r=0;r<7;r++) for(let c=0;c<7;c++) if(qrSeed[r][c]) cells.push({r,c});
+  const dots=[];
+  for(let r=0;r<8;r++) for(let c=0;c<8;c++) if((r+c*3+r*c)%3!==0) dots.push({r,c});
+  return (
+    <div style={{display:'flex',gap:80,alignItems:'center'}}>
+      <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:20}}>
+        <div style={{width:260,height:260,background:N,borderRadius:18,display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 8px 40px rgba(27,26,56,.3)'}}>
+          <svg width="210" height="210" viewBox="0 0 210 210">
+            {cells.map(({r,c})=><rect key={`${r}-${c}`} x={c*25+6} y={r*25+6} width="20" height="20" fill="#fff" rx="3"/>)}
+            {dots.map(({r,c})=><rect key={`d${r}-${c}`} x={c*12+4+80} y={r*12+4+80} width="9" height="9" fill="rgba(255,255,255,.65)" rx="1"/>)}
+            <rect x="88" y="88" width="34" height="34" fill="rgba(255,255,255,.15)" rx="5"/>
+            <text x="105" y="111" textAnchor="middle" fill="#fff" fontSize="16" fontWeight="900" fontFamily="Be Vietnam Pro">S</text>
+          </svg>
+        </div>
+        <div style={{fontSize:18,color:N,opacity:.45,textAlign:'center'}}>{t('qrHint')}</div>
+      </div>
+      <div style={{display:'flex',flexDirection:'column',gap:16,minWidth:420}}>
+        {[{l:t('qrBank'),v:'MB Bank'},{l:t('qrAcc'),v:'0123 4567 89'},{l:'Số tiền / Amount',v:fmt(netTotal)},{l:'Nội dung / Content',v:`STORMICK${ref}`}].map(({l,v},i)=>(
+          <div key={i} style={{background:'rgba(27,26,56,.06)',borderRadius:12,padding:'16px 26px'}}>
+            <div style={{fontSize:16,color:N,opacity:.45,marginBottom:4}}>{l}</div>
+            <div style={{fontSize:28,fontWeight:700,color:N,wordBreak:'break-all'}}>{v}</div>
+          </div>
+        ))}
+        <button onClick={()=>{if(!done){setDone(true);setTimeout(onPaid,900);}}} style={{marginTop:8,padding:'22px 36px',background:done?'#1E7A45':N,border:'none',borderRadius:12,fontSize:26,fontWeight:700,color:'#fff',cursor:done?'default':'pointer',transition:'background .3s',fontFamily:'Be Vietnam Pro'}}>
+          {done?'✓ Đã xác nhận thanh toán':t('qrDone')}
+        </button>
+      </div>
+    </div>
+  );
+};
+
+const PaymentScreen=({onNext,onPrev,total,inserted,setInserted,lang,setLang})=>{
+  const t=useLang();
+  const [tab,setTab]=useState('cash');
+  const [showCoupon,setShowCoupon]=useState(false);
+  const [appliedCoupon,setAppliedCoupon]=useState(null);
+  const discount=appliedCoupon?appliedCoupon.discountAmt:0;
+  const netTotal=Math.max(0,total-discount);
+  const paid=inserted>=netTotal;
+  const change=Math.max(0,inserted-netTotal);
+  useEffect(()=>{ if(paid){const tm=setTimeout(onNext,1800);return()=>clearTimeout(tm);} },[paid]);
+  const addCash=amt=>setInserted(a=>a+amt);
+  return (
+    <div className="screen">
+      <Grain/><BracketTL/><StepBar cur={3}/>
+      <LangToggle lang={lang} setLang={setLang}/>
+      <div style={{position:'absolute',right:-60,top:'40%',transform:'translateY(-50%) rotate(-90deg)',fontSize:280,fontWeight:900,fontStyle:'italic',color:'rgba(27,26,56,0.055)',lineHeight:1,pointerEvents:'none',zIndex:1,letterSpacing:-10,userSelect:'none'}}>{tab==='cash'?'CASH':'QR PAY'}</div>
+      <div style={{position:'absolute',top:60,left:110,zIndex:10}}>
+        <div style={{fontWeight:800,fontSize:60,color:N,lineHeight:1.1}}>{t('payment')}</div>
+        <div style={{fontStyle:'italic',fontSize:28,color:N,opacity:.45,marginTop:4}}>Payment</div>
+      </div>
+      {/* Tabs */}
+      <div style={{position:'absolute',top:170,left:110,display:'flex',background:'rgba(27,26,56,.08)',borderRadius:40,padding:4,zIndex:20}}>
+        {[{id:'cash',l:t('cash')},{id:'qr',l:t('qr')}].map(({id,l})=>(
+          <div key={id} onClick={()=>setTab(id)} style={{padding:'14px 48px',borderRadius:36,fontSize:26,fontWeight:700,background:tab===id?N:'transparent',color:tab===id?'#fff':N,cursor:'pointer',transition:'all .22s',userSelect:'none'}}>{l}</div>
+        ))}
+      </div>
+      {/* Voucher */}
+      {!paid&&(
+        <div style={{position:'absolute',top:183,right:190,zIndex:20}}>
+          <div onClick={()=>setShowCoupon(true)} style={{display:'flex',alignItems:'center',gap:10,padding:'14px 28px',border:`2.5px dashed ${appliedCoupon?'#1E7A45':N}`,borderRadius:40,cursor:'pointer',background:appliedCoupon?'rgba(30,122,69,.08)':'transparent',transition:'all .2s'}}>
+            <span style={{fontSize:26}}>🎫</span>
+            {appliedCoupon
+              ? <div style={{fontSize:18,fontWeight:700,color:'#1E7A45'}}>{appliedCoupon.code} — {appliedCoupon.label}</div>
+              : <div style={{fontSize:20,fontWeight:700,color:N}}>{t('voucher')}</div>
+            }
+            {appliedCoupon&&<div onClick={e=>{e.stopPropagation();setAppliedCoupon(null);}} style={{marginLeft:6,fontSize:18,color:'#999',cursor:'pointer',fontWeight:700}}>✕</div>}
+          </div>
+        </div>
+      )}
+      {/* Content */}
+      <div style={{position:'absolute',top:300,left:110,right:80,zIndex:10}}>
+        {tab==='cash'?(
+          <div style={{display:'flex',gap:80,alignItems:'flex-start'}}>
+            <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:18}}>
+              <div style={{fontWeight:700,fontSize:24,color:N,textAlign:'center'}}>{t('amtDue')}<br/><span style={{fontSize:16,fontStyle:'italic',opacity:.4}}>Cash</span></div>
+              <div style={{width:210,height:210,borderRadius:'50%',background:N,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',boxShadow:'0 8px 40px rgba(27,26,56,.3)'}}>
+                {discount>0&&<span style={{fontSize:16,color:'rgba(255,255,255,.4)',textDecoration:'line-through',marginBottom:2}}>{fmt(total)}</span>}
+                <span style={{fontSize:discount>0?28:36,fontWeight:800,color:'#fff',textAlign:'center',lineHeight:1}}>{netTotal.toLocaleString('vi-VN')}</span>
+                {discount>0&&<span style={{fontSize:14,color:'#7EE8A2',fontWeight:700,marginTop:4}}>−{fmt(discount)}</span>}
+              </div>
+            </div>
+            <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:18}}>
+              <div style={{fontWeight:700,fontSize:24,color:N,textAlign:'center'}}>{t('amtIn')}<br/><span style={{fontSize:16,fontStyle:'italic',opacity:.4}}>Add Amount</span></div>
+              <div style={{width:210,height:210,borderRadius:'50%',background:paid?'#1E7A45':N,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',transition:'background .6s',boxShadow:'0 8px 40px rgba(27,26,56,.3)'}}>
+                <span style={{fontSize:34,fontWeight:800,color:'#fff'}}>{inserted.toLocaleString('vi-VN')}</span>
+                {paid&&change>0&&<span style={{fontSize:14,color:'rgba(255,255,255,.7)',marginTop:4}}>Thối: {fmt(change)}</span>}
+              </div>
+            </div>
+            <div style={{display:'flex',flexDirection:'column',gap:12,marginTop:56}}>
+              <div style={{fontWeight:600,fontSize:18,color:N,opacity:.45,marginBottom:4}}>Bỏ tiền vào (giả lập):</div>
+              {[10000,20000,50000,100000,200000].map(amt=>(
+                <button key={amt} onClick={()=>addCash(amt)} disabled={paid} style={{padding:'12px 40px',background:'transparent',border:`2.5px solid ${N}`,borderRadius:9,fontSize:22,fontWeight:700,color:N,cursor:paid?'default':'pointer',opacity:paid?.3:1,fontFamily:'Be Vietnam Pro'}}>+ {amt.toLocaleString('vi-VN')}đ</button>
+              ))}
+            </div>
+          </div>
+        ):(
+          <QRTab netTotal={netTotal} onPaid={onNext} t={t}/>
+        )}
+      </div>
+      {/* CTA cash */}
+      {tab==='cash'&&(
+        <div style={{position:'absolute',bottom:170,left:110,zIndex:10}}>
+          {paid
+            ?<div style={{background:'#1E7A45',borderRadius:10,padding:'20px 64px'}}><span style={{fontSize:32,fontWeight:700,color:'#fff'}}>{t('payOK')} Đang chuyển tiếp…</span></div>
+            :<div style={{background:N,borderRadius:10,padding:'20px 64px',cursor:'pointer'}} onClick={()=>setInserted(netTotal)}><span style={{fontSize:32,fontWeight:700,color:'#fff'}}>{t('insertCash')}</span></div>
+          }
+        </div>
+      )}
+      <NavBtn label={t('prev')} sub="Before" onClick={onPrev} side="left"/>
+      {showCoupon&&<CouponOverlay baseTotal={total} onApply={c=>{setAppliedCoupon(c);setShowCoupon(false);}} onClose={()=>setShowCoupon(false)}/>}
+    </div>
+  );
+};
+
+// 6. READY GO
+const ReadyGoScreen=({onNext,frame,count,lang,setLang})=>{
+  const t=useLang();
+  const total=frame.slots*count;
+  return (
+    <div className="screen">
+      <Grain/><StepBar cur={4}/>
+      <Stars x={1590} y={55} size={96} flip/><Stars x={820} y={660} size={64}/>
+      <LangToggle lang={lang} setLang={setLang}/>
+      <div style={{position:'absolute',top:110,left:110,zIndex:10}}>
+        <div style={{fontWeight:900,fontStyle:'italic',fontSize:148,color:N,lineHeight:.92,letterSpacing:-4}}>{t('readyGo')}</div>
+        <div style={{fontWeight:900,fontStyle:'italic',fontSize:148,color:'rgba(27,26,56,.1)',lineHeight:.92,letterSpacing:-4,marginTop:10}}>{t('readyGo')}</div>
+        <div style={{display:'flex',flexDirection:'column',gap:16,marginTop:60}}>
+          <div style={{fontSize:38,fontWeight:700,color:N}}>{t('shots')} <span style={{fontSize:52,fontWeight:900}}>{total} lần</span></div>
+          <div style={{fontSize:38,fontWeight:700,color:N}}>{t('timeShot')} <span style={{fontSize:52,fontWeight:900}}>10 Giây</span></div>
+          <div style={{fontSize:26,fontWeight:500,color:N,opacity:.7}}>{t('autoCapt')}</div>
+        </div>
+        <button onClick={onNext} style={{marginTop:48,padding:'22px 88px',background:N,border:'none',borderRadius:10,cursor:'pointer',textAlign:'center',boxShadow:'0 6px 30px rgba(27,26,56,.3)'}}>
+          <div style={{fontSize:30,fontWeight:700,color:'#fff'}}>{t('getReady')}</div>
+          <div style={{fontSize:18,color:'rgba(255,255,255,.5)'}}>Get ready</div>
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// 7. COUNTDOWN
+const CountdownScreen=({shotNum,totalShots,onDone})=>{
+  const [n,setN]=useState(3);
+  useEffect(()=>{
+    if(n===0){const t=setTimeout(onDone,300);return()=>clearTimeout(t);}
+    const t=setTimeout(()=>setN(x=>x-1),1000);
+    return()=>clearTimeout(t);
+  },[n]);
+  const msg=n===3?'GET READY…':n===2?'ALMOST…':n===1?'SMILE! 😄':'';
+  return (
+    <div className="screen" style={{background:'#090910'}}>
+      <div style={{position:'absolute',top:40,right:60,background:'rgba(255,255,255,.12)',borderRadius:12,padding:'12px 32px',zIndex:10}}>
+        <span style={{fontSize:36,fontWeight:800,color:'#fff'}}>{shotNum} / {totalShots}</span>
+      </div>
+      <div style={{position:'absolute',inset:0,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',zIndex:10,gap:24}}>
+        <div key={n} style={{fontSize:280,fontWeight:900,fontStyle:'italic',color:'#fff',lineHeight:1,animation:'popIn .35s ease-out'}}>{n===0?'📸':n}</div>
+        <div style={{fontSize:30,fontWeight:500,color:'rgba(255,255,255,.45)',letterSpacing:5}}>{msg}</div>
+      </div>
+    </div>
+  );
+};
+
+// 8. CAPTURE
+const CaptureScreen=({shotNum,totalShots,onCapture})=>{
+  const [timer,setTimer]=useState(10);
+  const [flash,setFlash]=useState(false);
+  const captured=useRef(false);
+  const doCapture=useCallback(()=>{
+    if(captured.current)return;
+    captured.current=true;setFlash(true);
+    setTimeout(()=>{setFlash(false);onCapture();},500);
+  },[onCapture]);
+  useEffect(()=>{captured.current=false;setTimer(10);setFlash(false);},[shotNum]);
+  useEffect(()=>{
+    if(timer<=0){doCapture();return;}
+    const t=setTimeout(()=>setTimer(x=>x-1),1000);
+    return()=>clearTimeout(t);
+  },[timer]);
+  const r=46,circ=2*Math.PI*r,dash=circ-(circ*(10-timer)/10);
+  return (
+    <div className="screen" style={{background:'#07070f',cursor:'pointer'}} onClick={doCapture}>
+      {flash&&<div style={{position:'absolute',inset:0,background:'#fff',zIndex:100,pointerEvents:'none'}}/>}
+      <div style={{position:'absolute',top:32,right:44,display:'flex',alignItems:'center',gap:20,zIndex:20}}>
+        <svg width="110" height="110" viewBox="0 0 110 110">
+          <circle cx="55" cy="55" r={r} fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="6"/>
+          <circle cx="55" cy="55" r={r} fill="none" stroke="#fff" strokeWidth="6" strokeDasharray={circ} strokeDashoffset={dash} strokeLinecap="round" transform="rotate(-90 55 55)" style={{transition:'stroke-dashoffset 1s linear'}}/>
+          <text x="55" y="62" textAnchor="middle" fill="#fff" fontSize="26" fontWeight="800" fontFamily="Be Vietnam Pro">{timer}</text>
+        </svg>
+        <div style={{background:'rgba(255,255,255,.14)',borderRadius:10,padding:'12px 28px'}}><span style={{fontSize:38,fontWeight:800,color:'#fff'}}>{shotNum}/{totalShots}</span></div>
+      </div>
+      <div style={{position:'absolute',left:'50%',top:'50%',transform:'translate(-50%,-52%)',width:980,height:660,background:'#1a1a2e',borderRadius:10,overflow:'hidden',zIndex:10}}>
+        <div style={{position:'absolute',inset:0,background:'linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%)',display:'flex',alignItems:'center',justifyContent:'center',flexDirection:'column',gap:16}}>
+          <div style={{fontSize:72,opacity:.2}}>📷</div>
+          <div style={{fontSize:20,color:'rgba(255,255,255,.2)',letterSpacing:4}}>CAMERA PREVIEW</div>
+        </div>
+        {[['top','left'],['top','right'],['bottom','left'],['bottom','right']].map(([v,h],i)=>(
+          <div key={i} style={{position:'absolute',[v]:18,[h]:18,width:44,height:44,borderTop:v==='top'?'3px solid rgba(255,255,255,.4)':'none',borderBottom:v==='bottom'?'3px solid rgba(255,255,255,.4)':'none',borderLeft:h==='left'?'3px solid rgba(255,255,255,.4)':'none',borderRight:h==='right'?'3px solid rgba(255,255,255,.4)':'none'}}/>
+        ))}
+      </div>
+      <div style={{position:'absolute',bottom:70,left:0,right:0,textAlign:'center',zIndex:20}}>
+        <div style={{fontSize:28,fontWeight:600,color:'rgba(255,255,255,.85)'}}>Nhìn vào ống kính và nhấn nút chụp</div>
+        <div style={{fontSize:18,color:'rgba(255,255,255,.4)',marginTop:4}}>Look at the lens and press the shutter</div>
+      </div>
+      <div onClick={e=>{e.stopPropagation();doCapture();}} style={{position:'absolute',bottom:70,left:'50%',transform:'translateX(360px)',width:96,height:96,borderRadius:'50%',background:'#fff',border:'7px solid rgba(255,255,255,.35)',cursor:'pointer',zIndex:20}}/>
+    </div>
+  );
+};
+
+// 9. PHOTO SELECT — with Retake
+const PhotoSelectScreen=({onNext,onRetake,totalShots,neededSlots})=>{
+  const t=useLang();
+  const [sel,setSel]=useState([]);
+  const toggle=i=>setSel(prev=>{
+    if(prev.includes(i)) return prev.filter(x=>x!==i);
+    if(prev.length>=neededSlots) return [...prev.slice(1),i];
+    return [...prev,i];
+  });
+  const ready=sel.length===neededSlots;
+  return (
+    <div className="screen">
+      <Grain/><StepBar cur={6}/>
+      <div style={{position:'absolute',top:50,left:100,right:340,zIndex:10}}>
+        <div style={{fontWeight:800,fontSize:46,color:N,lineHeight:1.1}}>{t('selPhoto')} <span style={{fontWeight:400,fontSize:30,opacity:.4}}>(Có thể chọn trùng ảnh)</span></div>
+        <div style={{fontStyle:'italic',fontSize:22,color:N,opacity:.4,marginTop:6}}>{t('selPhotoS')}</div>
+      </div>
+      <div style={{position:'absolute',top:165,left:60,right:360,display:'flex',flexWrap:'wrap',gap:18,rowGap:40,zIndex:10,alignContent:'flex-start'}}>
+        {Array.from({length:totalShots}).map((_,i)=>(
+          <div key={i} style={{position:'relative',flexShrink:0}}>
+            <div onClick={()=>toggle(i)} style={{width:196,height:148,borderRadius:10,background:PHOTOS[i%PHOTOS.length],cursor:'pointer',position:'relative',overflow:'hidden',outline:sel.includes(i)?`4px solid ${N}`:'4px solid transparent',transition:'outline .15s'}}>
+              {sel.includes(i)&&(
+                <div style={{position:'absolute',top:8,right:8,background:N,borderRadius:'50%',width:32,height:32,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                  <span style={{color:'#fff',fontWeight:800,fontSize:16}}>{sel.indexOf(i)+1}</span>
+                </div>
+              )}
+              <div style={{position:'absolute',bottom:0,left:0,right:0,padding:'6px 0',background:'rgba(27,26,56,.3)',textAlign:'center',fontSize:14,color:'rgba(255,255,255,.7)',fontWeight:500}}>Shot {i+1}</div>
+            </div>
+            {/* Retake button */}
+            <div onClick={()=>onRetake(i)} style={{position:'absolute',bottom:-30,left:'50%',transform:'translateX(-50%)',background:'#fff',border:`2px solid ${N}`,borderRadius:20,padding:'5px 20px',fontSize:15,fontWeight:700,color:N,cursor:'pointer',whiteSpace:'nowrap',boxShadow:'0 2px 8px rgba(0,0,0,.1)',zIndex:5,display:'flex',alignItems:'center',gap:6}}>
+              <span style={{fontSize:13}}>↺</span>{t('retake')}
+            </div>
+          </div>
+        ))}
+      </div>
+      {/* Strip preview */}
+      <div style={{position:'absolute',right:40,top:140,width:280,zIndex:10}}>
+        <div style={{fontWeight:600,fontSize:16,color:N,opacity:.45,marginBottom:10,lineHeight:1.4}}>Nhấn ảnh để huỷ chọn<br/><em>Tap photo to deselect</em></div>
+        <div style={{display:'flex',flexDirection:'column',gap:8,background:'#fff',padding:10,borderRadius:10,boxShadow:'0 4px 24px rgba(0,0,0,.1)'}}>
+          {Array.from({length:neededSlots}).map((_,i)=>{
+            const idx=sel[i];
+            return <div key={i} style={{height:Math.max(90,Math.floor(520/neededSlots)),borderRadius:6,background:idx!==undefined?PHOTOS[idx%PHOTOS.length]:'#E0DDD6',transition:'background .3s',display:'flex',alignItems:'center',justifyContent:'center'}}>
+              {idx===undefined&&<span style={{fontSize:24,opacity:.25}}>+</span>}
+            </div>;
+          })}
+        </div>
+        <div style={{marginTop:14,textAlign:'center',fontSize:16,color:N,opacity:.45}}>{sel.length} / {neededSlots} ảnh đã chọn</div>
+      </div>
+      {ready&&<NavBtn label={t('next')} sub="After" onClick={()=>onNext(sel)} side="right"/>}
+    </div>
+  );
+};
+
+// 10. FILTER + STICKER
+const BG_OPTS=[
+  {label:'STAY\nCOOL',bg:'#F0EDE6',textColor:'#333'},
+  {label:'',bg:'linear-gradient(135deg,#8e24aa,#e040fb)'},
+  {label:'',bg:'linear-gradient(135deg,#26a69a,#f9a825)'},
+  {label:'',bg:'linear-gradient(135deg,#667eea,#764ba2)'},
+  {label:'BELIEVE\nLOVE',bg:'linear-gradient(135deg,#e53935,#ff8f00)',textColor:'rgba(255,255,255,.85)'},
+  {label:'',bg:'linear-gradient(135deg,#f06292,#ce93d8)'},
+  {label:'',bg:'radial-gradient(circle,#f48fb1,#ad1457)'},
+  {label:'',bg:'radial-gradient(circle,#212121,#000)'},
+  {label:'',bg:'radial-gradient(circle,#cfd8dc,#90a4ae)'},
+];
+const STICKER_SETS=[
+  {label:'Emoji',items:['❤️','⭐','🔥','💋','🌸','🌈','📸','✨','😄','🥂','🎉','💫']},
+  {label:'Text',items:['STORMICK','bạn bè ♡','memories','2024','chill','vibes','smile','bestie']},
+  {label:'Stamp',items:['📅 '+new Date().toLocaleDateString('vi-VN'),'⭐ VIP','💎 Premium','🏆 Best Shot','✦ FILM','◉ STUDIO']},
+];
+
+const FilterStickerScreen=({onNext,selPhotos,lang,setLang})=>{
+  const t=useLang();
+  const [filter,setFilter]=useState('none');
+  const [bg,setBg]=useState(0);
+  const [flipped,setFlipped]=useState(false);
+  const [activeTab,setActiveTab]=useState('filter');
+  const [stickerSet,setStickerSet]=useState(0);
+  const [stickers,setStickers]=useState([]); // [{content,slot}] slot: 'top'|'mid'|'bot'
+  const fStyle=filter==='gray'?'grayscale(100%)':filter==='bright'?'brightness(1.4) contrast(1.05)':'none';
+  const bgStyleProps=BG_OPTS[bg].bg.startsWith('linear')||BG_OPTS[bg].bg.startsWith('radial')?{backgroundImage:BG_OPTS[bg].bg}:{backgroundColor:BG_OPTS[bg].bg};
+  const slots=['top','mid','bot'];
+  const addSticker=item=>{
+    const slot=slots[stickers.length%3];
+    setStickers(prev=>[...prev,{content:item,slot,uid:Date.now()+Math.random()}]);
+  };
+  const removeSticker=uid=>setStickers(prev=>prev.filter(s=>s.uid!==uid));
+  const stickersBySlot=slot=>stickers.filter(s=>s.slot===slot);
+  return (
+    <div className="screen">
+      <Grain/><StepBar cur={7}/>
+      <LangToggle lang={lang} setLang={setLang}/>
+      {/* Left panel */}
+      <div style={{position:'absolute',top:50,left:50,width:400,bottom:60,zIndex:10,display:'flex',flexDirection:'column',gap:0}}>
+        {/* Tab bar */}
+        <div style={{display:'flex',background:'rgba(27,26,56,.08)',borderRadius:40,padding:4,marginBottom:28,flexShrink:0}}>
+          {[{id:'filter',l:'Filter & Nền'},{id:'sticker',l:t('stickerTab')}].map(({id,l})=>(
+            <div key={id} onClick={()=>setActiveTab(id)} style={{flex:1,padding:'13px 0',borderRadius:36,fontSize:20,fontWeight:700,textAlign:'center',background:activeTab===id?N:'transparent',color:activeTab===id?'#fff':N,cursor:'pointer',transition:'all .22s',userSelect:'none'}}>{l}</div>
+          ))}
+        </div>
+        {activeTab==='filter'?(
+          <div style={{display:'flex',flexDirection:'column',gap:0,flex:1,overflowY:'auto'}}>
+            <div style={{fontWeight:800,fontSize:38,color:N}}>{t('selFilter')}</div>
+            <div style={{fontStyle:'italic',fontSize:17,color:N,opacity:.4,marginBottom:22}}>{t('selFilterS')}</div>
+            <div style={{display:'flex',gap:20,marginBottom:24}}>
+              {[{id:'bright',icon:'☀',l:t('brightness'),s:t('brightS')},{id:'gray',icon:'◑',l:t('grayscale'),s:t('grayS')}].map(f=>(
+                <div key={f.id} style={{display:'flex',flexDirection:'column',alignItems:'center',gap:10}}>
+                  <div onClick={()=>setFilter(filter===f.id?'none':f.id)} style={{width:108,height:108,borderRadius:'50%',border:`3.5px solid ${filter===f.id?N:'#CCC'}`,background:filter===f.id?N:'#fff',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',transition:'all .2s'}}>
+                    <span style={{fontSize:36,filter:'grayscale(1)',color:filter===f.id?'#fff':N}}>{f.icon}</span>
+                  </div>
+                  <div style={{textAlign:'center'}}><div style={{fontSize:15,fontWeight:700,color:N}}>{f.l}</div><div style={{fontSize:12,color:N,opacity:.4}}>{f.s}</div></div>
+                </div>
+              ))}
+            </div>
+            <div onClick={()=>setFlipped(f=>!f)} style={{display:'flex',alignItems:'center',gap:14,padding:'14px 22px',border:`2.5px solid ${N}`,borderRadius:10,cursor:'pointer',background:flipped?'rgba(27,26,56,.06)':'transparent',transition:'all .2s',marginBottom:28}}>
+              <span style={{fontSize:26,fontWeight:700,color:N}}>↔</span>
+              <div><div style={{fontSize:18,fontWeight:700,color:N}}>{t('flipH')}</div><div style={{fontSize:13,color:N,opacity:.4}}>{t('flipHS')}</div></div>
+            </div>
+            <div style={{fontWeight:800,fontSize:38,color:N}}>{t('selBg')}</div>
+            <div style={{fontStyle:'italic',fontSize:17,color:N,opacity:.4,marginBottom:18}}>{t('selBgS')}</div>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:14}}>
+              {BG_OPTS.map((b,i)=>(
+                <div key={i} onClick={()=>setBg(i)} style={{width:104,height:104,borderRadius:'50%',cursor:'pointer',...(b.bg.startsWith('linear')||b.bg.startsWith('radial')?{backgroundImage:b.bg}:{backgroundColor:b.bg}),outline:bg===i?`4px solid ${N}`:'4px solid transparent',outlineOffset:3,transition:'outline .2s',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:800,color:b.textColor||'transparent',textAlign:'center',lineHeight:1.3,whiteSpace:'pre-line'}}>{b.label}</div>
+              ))}
+            </div>
+          </div>
+        ):(
+          <div style={{display:'flex',flexDirection:'column',gap:0,flex:1,overflowY:'auto'}}>
+            <div style={{fontWeight:800,fontSize:38,color:N}}>{t('stickerTab')}</div>
+            <div style={{fontStyle:'italic',fontSize:17,color:N,opacity:.4,marginBottom:18}}>{t('stickerHint')}</div>
+            {/* Set tabs */}
+            <div style={{display:'flex',gap:8,marginBottom:16,flexShrink:0}}>
+              {STICKER_SETS.map((s,i)=>(
+                <div key={i} onClick={()=>setStickerSet(i)} style={{padding:'8px 18px',borderRadius:20,fontSize:16,fontWeight:700,background:stickerSet===i?N:'rgba(27,26,56,.08)',color:stickerSet===i?'#fff':N,cursor:'pointer',transition:'all .2s',userSelect:'none'}}>{s.label}</div>
+              ))}
+            </div>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,marginBottom:18}}>
+              {STICKER_SETS[stickerSet].items.map((item,i)=>(
+                <div key={i} onClick={()=>addSticker(item)} style={{padding:'10px 6px',borderRadius:10,background:'rgba(27,26,56,.07)',border:'2px solid rgba(27,26,56,.1)',cursor:'pointer',textAlign:'center',fontSize:item.length>4?14:22,fontWeight:700,color:N,transition:'background .15s',userSelect:'none',lineHeight:1.3}}>{item}</div>
+              ))}
+            </div>
+            {stickers.length>0&&(
+              <>
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
+                  <span style={{fontSize:16,fontWeight:600,color:N,opacity:.5}}>Đã thêm ({stickers.length})</span>
+                  <span onClick={()=>setStickers([])} style={{fontSize:15,color:N,opacity:.4,cursor:'pointer',textDecoration:'underline'}}>{t('clearAll')}</span>
+                </div>
+                <div style={{display:'flex',flexDirection:'column',gap:6,maxHeight:160,overflowY:'auto'}}>
+                  {stickers.map(s=>(
+                    <div key={s.uid} style={{display:'flex',alignItems:'center',justifyContent:'space-between',background:'rgba(27,26,56,.05)',borderRadius:8,padding:'8px 14px'}}>
+                      <span style={{fontSize:17,color:N,flex:1}}>{s.content}</span>
+                      <span style={{fontSize:13,color:N,opacity:.35,marginRight:10}}>{s.slot==='top'?'↑ trên':s.slot==='mid'?'→ giữa':'↓ dưới'}</span>
+                      <div onClick={()=>removeSticker(s.uid)} style={{fontSize:18,cursor:'pointer',color:'#bbb',fontWeight:700}}>✕</div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+      {/* Center strip preview */}
+      <div style={{position:'absolute',left:'50%',top:'50%',transform:'translate(-50%,-50%)',zIndex:10}}>
+        <div style={{...bgStyleProps,padding:16,borderRadius:12,display:'flex',flexDirection:'column',gap:10,transform:flipped?'scaleX(-1)':'none',transition:'transform .4s, filter .3s',filter:fStyle,boxShadow:'0 12px 50px rgba(0,0,0,.25)',minWidth:236,position:'relative'}}>
+          {/* Top sticker row */}
+          {stickersBySlot('top').length>0&&(
+            <div style={{display:'flex',gap:6,flexWrap:'wrap',justifyContent:'center',padding:'4px 0'}}>
+              {stickersBySlot('top').map(s=>(
+                <span key={s.uid} style={{fontSize:s.content.length>3?13:20,fontWeight:700,color:'#fff',textShadow:'0 1px 6px rgba(0,0,0,.6)',background:'rgba(0,0,0,.28)',borderRadius:20,padding:'3px 10px',whiteSpace:'nowrap'}}>{s.content}</span>
+              ))}
+            </div>
+          )}
+          {selPhotos.slice(0,4).map((idx,i)=>(
+            <div key={i} style={{width:204,height:115,borderRadius:8,background:PHOTOS[idx%PHOTOS.length],position:'relative',display:'flex',alignItems:'center',justifyContent:'center'}}>
+              {stickersBySlot('mid').map(s=>(
+                <span key={s.uid} style={{position:'absolute',fontSize:s.content.length>3?14:28,fontWeight:800,textShadow:'0 2px 8px rgba(0,0,0,.7)',userSelect:'none'}}>{s.content}</span>
+              ))}
+            </div>
+          ))}
+          {/* Bot sticker row */}
+          {stickersBySlot('bot').length>0&&(
+            <div style={{display:'flex',gap:6,flexWrap:'wrap',justifyContent:'center',padding:'4px 0'}}>
+              {stickersBySlot('bot').map(s=>(
+                <span key={s.uid} style={{fontSize:s.content.length>3?13:20,fontWeight:700,color:'#fff',textShadow:'0 1px 6px rgba(0,0,0,.6)',background:'rgba(0,0,0,.28)',borderRadius:20,padding:'3px 10px',whiteSpace:'nowrap'}}>{s.content}</span>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+      {/* Print button */}
+      <div onClick={onNext} style={{position:'absolute',right:72,bottom:72,width:140,height:140,borderRadius:'50%',background:N,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',cursor:'pointer',zIndex:20,boxShadow:'0 8px 32px rgba(27,26,56,.4)',animation:'pulse 2s ease-in-out infinite'}}>
+        <span style={{fontSize:30,fontWeight:800,color:'#fff'}}>{t('print')}</span>
+        <span style={{fontSize:15,color:'rgba(255,255,255,.5)'}}>Print</span>
+      </div>
+    </div>
+  );
+};
+
+// 11. PRINTING
+const PrintingScreen=({onDone,selPhotos,lang,setLang})=>{
+  const t=useLang();
+  const [prog,setProg]=useState(0);
+  const [done,setDone]=useState(false);
+  useEffect(()=>{
+    const iv=setInterval(()=>{setProg(p=>{if(p>=100){clearInterval(iv);setDone(true);return 100;}return p+1.4;});},60);
+    return()=>clearInterval(iv);
+  },[]);
+  const qrSeed=[[1,1,1,0,1,1,1],[1,0,1,0,1,0,1],[1,0,1,0,1,0,1],[0,0,0,0,0,0,0],[1,0,1,0,1,1,1],[1,0,0,0,0,0,1],[1,1,1,0,1,1,1]];
+  const cells=[];for(let r=0;r<7;r++) for(let c=0;c<7;c++) if(qrSeed[r][c]) cells.push({r,c});
+  const dots=[];for(let r=0;r<12;r++) for(let c=0;c<12;c++) if((r+c*3+r*c)%3!==0) dots.push({r,c});
+  return (
+    <div className="screen">
+      <Grain/><StepBar cur={8}/>
+      <Stars x={1540} y={55} size={80} flip/>
+      <LangToggle lang={lang} setLang={setLang}/>
+      <div style={{position:'absolute',top:80,left:110,zIndex:10}}>
+        <div style={{fontWeight:800,fontSize:72,color:N,lineHeight:1}}>{done?t('printDone'):t('printing')}</div>
+        <div style={{fontStyle:'italic',fontSize:30,color:N,opacity:.4,marginTop:6}}>Printing</div>
+      </div>
+      <div style={{position:'absolute',top:240,left:110,zIndex:10}}>
+        <div style={{width:230,height:230,background:N,borderRadius:14,display:'flex',alignItems:'center',justifyContent:'center',marginBottom:28,boxShadow:'0 6px 32px rgba(27,26,56,.3)'}}>
+          <svg width="180" height="180" viewBox="0 0 180 180">
+            {cells.map(({r,c})=><rect key={`${r}-${c}`} x={c*22+4} y={r*22+4} width="18" height="18" fill="#fff" rx="2"/>)}
+            {dots.map(({r,c})=><rect key={`d${r}-${c}`} x={c*12+2+60} y={r*12+2+60} width="9" height="9" fill="#fff" rx="1"/>)}
+          </svg>
+        </div>
+        <div style={{width:460,marginBottom:16}}>
+          <div style={{height:10,background:'rgba(27,26,56,.14)',borderRadius:5,overflow:'hidden'}}>
+            <div style={{height:'100%',width:`${prog}%`,background:done?'#1E7A45':N,borderRadius:5,transition:'width .07s linear, background .5s'}}/>
+          </div>
+          <div style={{fontSize:20,fontWeight:600,color:N,opacity:.5,marginTop:8}}>{Math.floor(prog)}%</div>
+        </div>
+        <div style={{fontWeight:700,fontSize:30,color:N,lineHeight:1.6}}>{t('scanDL')}</div>
+        <div style={{fontSize:18,color:N,opacity:.4}}>Download Photos and Videos to phone</div>
+      </div>
+      <div style={{position:'absolute',right:100,top:150,width:220,zIndex:10}}>
+        <div style={{background:'#fff',padding:10,borderRadius:10,boxShadow:'0 6px 36px rgba(0,0,0,.13)',display:'flex',flexDirection:'column',gap:6}}>
+          {selPhotos.slice(0,4).map((idx,i)=>(
+            <div key={i} style={{height:108,borderRadius:6,background:PHOTOS[idx%PHOTOS.length]}}/>
+          ))}
+        </div>
+      </div>
+      {done&&<NavBtn label={t('end')} sub="End" onClick={onDone} side="right"/>}
+    </div>
+  );
+};
+
+// ══════════════════════════════════════════════════════════════
+// APP
+// ══════════════════════════════════════════════════════════════
+const App=()=>{
+  const [lang,setLang]=useState('vi');
+  const [screen,setScreen]=useState('splash');
+  const [dir,setDir]=useState('right');
+  const [selFrame,setSelFrame]=useState(null);
+  const [count,setCount]=useState(2);
+  const [inserted,setInserted]=useState(0);
+  const [shotNum,setShotNum]=useState(1);
+  const [capturing,setCapturing]=useState(false);
+  const [selPhotos,setSelPhotos]=useState([0,1,2,3]);
+
+  // ── Idle timeout ──
+  const [idleRem,setIdleRem]=useState(null);
+  const idleRef=useRef(null);
+  const cdownRef=useRef(null);
+
+  const resetIdle=useCallback(()=>{
+    clearTimeout(idleRef.current);
+    clearInterval(cdownRef.current);
+    setIdleRem(null);
+    idleRef.current=setTimeout(()=>{
+      let rem=IDLE_RESET_AT-IDLE_WARN_AT;
+      setIdleRem(rem);
+      cdownRef.current=setInterval(()=>{
+        rem--;
+        setIdleRem(rem);
+        if(rem<=0){clearInterval(cdownRef.current);setIdleRem(null);doReset();}
+      },1000);
+    },IDLE_WARN_AT*1000);
+  },[screen]);
+
+  // Don't idle on splash
+  useEffect(()=>{
+    if(screen==='splash'){clearTimeout(idleRef.current);clearInterval(cdownRef.current);setIdleRem(null);return;}
+    const events=['mousedown','touchstart','keydown'];
+    events.forEach(e=>window.addEventListener(e,resetIdle,{passive:true}));
+    resetIdle();
+    return()=>{events.forEach(e=>window.removeEventListener(e,resetIdle));clearTimeout(idleRef.current);clearInterval(cdownRef.current);};
+  },[screen]);
+
+  // ── Scale ──
+  useEffect(()=>{
+    const el=document.getElementById('stage');
+    const scale=()=>{const s=Math.min(window.innerWidth/W,window.innerHeight/H);el.style.transform=`scale(${s})`;el.style.left=`${(window.innerWidth-W*s)/2}px`;el.style.top=`${(window.innerHeight-H*s)/2}px`;};
+    scale();
+    window.addEventListener('resize',scale);
+    return()=>window.removeEventListener('resize',scale);
+  },[]);
+
+  const total=selFrame?selFrame.price+Math.max(0,count-1)*40000:0;
+  const totalShots=selFrame?selFrame.slots*count:0;
+  const neededSlots=selFrame?selFrame.slots:4;
+
+  const go=(s,d='right')=>{setDir(d);setScreen(s);};
+  const doReset=()=>{
+    setSelFrame(null);setCount(2);setInserted(0);setShotNum(1);
+    setCapturing(false);setSelPhotos([0,1,2,3]);
+    setDir('right');setScreen('splash');
+  };
+  const startSession=()=>{setShotNum(1);setCapturing(false);go('shooting');};
+  const onCaptured=()=>{ if(shotNum<totalShots){setShotNum(n=>n+1);setCapturing(false);}else{go('photo-select');} };
+  const handleRetake=slotIdx=>{setShotNum(slotIdx+1);setCapturing(false);go('shooting');};
+
+  const sp={lang,setLang};
+
+  return (
+    <LangCtx.Provider value={lang}>
+      <div id="stage">
+        {idleRem!==null&&<IdleOverlay remaining={idleRem} onContinue={resetIdle}/>}
+        <ScreenWrap screenKey={screen} dir={dir}>
+          {screen==='splash'&&<SplashScreen onNext={()=>go('frame-select')} {...sp}/>}
+          {screen==='frame-select'&&<FrameSelectScreen selFrame={selFrame} setSelFrame={setSelFrame} onNext={()=>{if(selFrame)go('photo-count');}} onPrev={()=>go('splash','left')} {...sp}/>}
+          {screen==='photo-count'&&<PhotoCountScreen count={count} setCount={setCount} framePrice={selFrame?.price||70000} onNext={()=>go('order-summary')} onPrev={()=>go('frame-select','left')} {...sp}/>}
+          {screen==='order-summary'&&<OrderSummaryScreen frame={selFrame} count={count} onNext={()=>{setInserted(0);go('payment');}} onPrev={()=>go('photo-count','left')} {...sp}/>}
+          {screen==='payment'&&<PaymentScreen total={total} inserted={inserted} setInserted={setInserted} onNext={()=>go('ready-go')} onPrev={()=>go('order-summary','left')} {...sp}/>}
+          {screen==='ready-go'&&<ReadyGoScreen frame={selFrame} count={count} onNext={startSession} {...sp}/>}
+          {screen==='shooting'&&!capturing&&<CountdownScreen shotNum={shotNum} totalShots={totalShots} onDone={()=>setCapturing(true)}/>}
+          {screen==='shooting'&&capturing&&<CaptureScreen shotNum={shotNum} totalShots={totalShots} onCapture={onCaptured}/>}
+          {screen==='photo-select'&&<PhotoSelectScreen totalShots={totalShots} neededSlots={neededSlots} onNext={p=>{setSelPhotos(p);go('filter-select');}} onRetake={handleRetake}/>}
+          {screen==='filter-select'&&<FilterStickerScreen selPhotos={selPhotos} onNext={()=>go('printing')} {...sp}/>}
+          {screen==='printing'&&<PrintingScreen selPhotos={selPhotos} onDone={doReset} {...sp}/>}
+        </ScreenWrap>
+      </div>
+    </LangCtx.Provider>
+  );
+};
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

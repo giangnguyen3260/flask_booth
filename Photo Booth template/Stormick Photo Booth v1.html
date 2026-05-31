@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stormick Photo Booth — Prototype</title>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,600;1,700;1,800;1,900&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{width:100%;height:100%;background:#0a0a0f;overflow:hidden;display:flex;align-items:center;justify-content:center;}
+#stage{position:absolute;width:1920px;height:1080px;transform-origin:top left;}
+.screen{position:absolute;inset:0;width:1920px;height:1080px;font-family:'Be Vietnam Pro',sans-serif;overflow:hidden;background:#ECEAE3;}
+button{font-family:'Be Vietnam Pro',sans-serif;}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect,useRef,useCallback} = React;
+const N = '#1B1A38';   // navy
+const C = '#ECEAE3';   // cream
+const W = 1920, H = 1080;
+
+// ── SHARED ATOMS ──────────────────────────────────────────────
+const Grain = () => (
+  <svg style={{position:'absolute',inset:0,width:'100%',height:'100%',opacity:0.09,pointerEvents:'none',zIndex:15}} xmlns="http://www.w3.org/2000/svg">
+    <filter id="gf"><feTurbulence type="fractalNoise" baseFrequency="0.72" numOctaves="4" stitchTiles="stitch"/></filter>
+    <rect width="100%" height="100%" filter="url(#gf)"/>
+  </svg>
+);
+
+const Star = ({x,y,size=72,small=false,style={}}) => (
+  <div style={{position:'absolute',left:x,top:y,pointerEvents:'none',zIndex:4,...style}}>
+    <svg width={size} height={size} viewBox="0 0 72 72" fill="none">
+      <path d="M36 3 L39.8 32.2 L69 36 L39.8 39.8 L36 69 L32.2 39.8 L3 36 L32.2 32.2 Z" fill={N}/>
+      {small && <path d="M59 10 L60.4 14.6 L65 16 L60.4 17.4 L59 22 L57.6 17.4 L53 16 L57.6 14.6 Z" fill={N}/>}
+    </svg>
+  </div>
+);
+
+const Stars = ({x,y,size=80,flip=false}) => (
+  <div style={{position:'absolute',left:x,top:y,pointerEvents:'none',zIndex:4,transform:flip?'scaleX(-1)':'none'}}>
+    <svg width={size} height={size} viewBox="0 0 80 80" fill="none">
+      <path d="M36 2 L39.5 32.5 L70 36 L39.5 39.5 L36 70 L32.5 39.5 L2 36 L32.5 32.5 Z" fill={N}/>
+      <path d="M66 6 L67.4 10.6 L72 12 L67.4 13.4 L66 18 L64.6 13.4 L60 12 L64.6 10.6 Z" fill={N}/>
+    </svg>
+  </div>
+);
+
+const BracketTL = () => (
+  <svg style={{position:'absolute',top:0,left:0,pointerEvents:'none',zIndex:5}} width="220" height="200" viewBox="0 0 220 200">
+    <rect x="14" y="14" width="130" height="8" fill={N} rx="2"/>
+    <rect x="14" y="14" width="8" height="130" fill={N} rx="2"/>
+    <rect x="28" y="28" width="85" height="5" fill={N} rx="1"/>
+    <rect x="28" y="28" width="5" height="85" fill={N} rx="1"/>
+    <rect x="14" y="36" width="14" height="5" fill={C}/>
+    <rect x="36" y="14" width="5" height="14" fill={C}/>
+  </svg>
+);
+
+const BracketBR = () => (
+  <svg style={{position:'absolute',bottom:0,right:0,pointerEvents:'none',zIndex:5}} width="220" height="200" viewBox="0 0 220 200">
+    <rect x="76" y="178" width="130" height="8" fill={N} rx="2"/>
+    <rect x="198" y="58" width="8" height="130" fill={N} rx="2"/>
+    <rect x="107" y="167" width="85" height="5" fill={N} rx="1"/>
+    <rect x="187" y="87" width="5" height="85" fill={N} rx="1"/>
+    <rect x="187" y="167" width="16" height="5" fill={C}/>
+    <rect x="107" y="167" width="5" height="16" fill={C}/>
+  </svg>
+);
+
+const DiagAccents = () => (
+  <div style={{position:'absolute',inset:0,overflow:'hidden',pointerEvents:'none',zIndex:3}}>
+    <div style={{position:'absolute',top:-24,right:-100,width:580,height:52,background:N,transform:'rotate(-18deg)'}}/>
+    <div style={{position:'absolute',top:38,right:-130,width:560,height:18,background:N,transform:'rotate(-18deg)',opacity:.85}}/>
+    <div style={{position:'absolute',bottom:-18,left:-100,width:1300,height:28,background:N,transform:'rotate(-2.5deg)'}}/>
+    <div style={{position:'absolute',bottom:16,left:-100,width:1000,height:14,background:N,transform:'rotate(-2.5deg)',opacity:.7}}/>
+  </div>
+);
+
+const NavBtn = ({label,sub,onClick,side='left',disabled=false}) => (
+  <div onClick={disabled?null:onClick} style={{
+    position:'absolute',bottom:44,[side]:64,width:112,height:112,borderRadius:'50%',
+    background: disabled?'rgba(27,26,56,0.25)':N,cursor:disabled?'default':'pointer',
+    display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',
+    zIndex:20,userSelect:'none',transition:'opacity .2s'
+  }}>
+    <span style={{color:'#fff',fontWeight:800,fontSize:20,lineHeight:1}}>{label}</span>
+    <span style={{color:'rgba(255,255,255,0.5)',fontSize:13,marginTop:2}}>{sub}</span>
+  </div>
+);
+
+const STEPS=['Khung','Số lượng','Thanh toán','Ready!','Chụp','Chọn ảnh','Filter','In ảnh'];
+const StepBar = ({cur}) => (
+  <div style={{position:'absolute',top:0,left:0,right:0,height:7,display:'flex',gap:3,zIndex:25}}>
+    {STEPS.map((s,i)=>(
+      <div key={i} style={{flex:1,height:'100%',background:i<=cur?N:'rgba(27,26,56,0.18)',borderRadius:'0 0 3px 3px',transition:'background .5s'}}/>
+    ))}
+  </div>
+);
+
+const fmt = n => n.toLocaleString('vi-VN') + 'đ';
+
+// ── FRAME DATA & SVG PREVIEWS ──────────────────────────────────
+const FRAMES = [
+  {id:1,label:'2-Strip',slots:2,price:70000},
+  {id:2,label:'3-Strip',slots:3,price:100000},
+  {id:3,label:'4-Grid',slots:4,price:100000},
+  {id:4,label:'4-Strip',slots:4,price:100000},
+  {id:5,label:'Mixed',slots:3,price:100000},
+  {id:6,label:'2-Wide',slots:2,price:100000},
+];
+
+const ph = {fill:'#D0CEC8',rx:'3'};
+const FrameSVG = ({id,sel}) => {
+  const brd = {fill:'#fff',stroke:sel?N:'#D8D5CF',strokeWidth:sel?5:2};
+  if(id===1) return <svg width="110" height="170" viewBox="0 0 110 170"><rect width="110" height="170" {...brd} rx="4"/><rect x="8" y="8" width="94" height="72" {...ph}/><rect x="8" y="90" width="94" height="72" {...ph}/></svg>;
+  if(id===2) return <svg width="100" height="190" viewBox="0 0 100 190"><rect width="100" height="190" {...brd} rx="4"/><rect x="7" y="7" width="86" height="54" {...ph}/><rect x="7" y="69" width="86" height="54" {...ph}/><rect x="7" y="131" width="86" height="52" {...ph}/></svg>;
+  if(id===3) return <svg width="170" height="170" viewBox="0 0 170 170"><rect width="170" height="170" {...brd} rx="4"/><rect x="8" y="8" width="72" height="72" {...ph}/><rect x="90" y="8" width="72" height="72" {...ph}/><rect x="8" y="90" width="72" height="72" {...ph}/><rect x="90" y="90" width="72" height="72" {...ph}/></svg>;
+  if(id===4) return <svg width="80" height="210" viewBox="0 0 80 210"><rect width="80" height="210" {...brd} rx="4"/><rect x="7" y="7" width="66" height="42" {...ph}/><rect x="7" y="57" width="66" height="42" {...ph}/><rect x="7" y="107" width="66" height="42" {...ph}/><rect x="7" y="157" width="66" height="46" {...ph}/></svg>;
+  if(id===5) return <svg width="170" height="130" viewBox="0 0 170 130"><rect width="170" height="130" {...brd} rx="4"/><rect x="8" y="8" width="90" height="114" {...ph}/><rect x="108" y="8" width="54" height="52" {...ph}/><rect x="108" y="70" width="54" height="52" {...ph}/></svg>;
+  if(id===6) return <svg width="200" height="130" viewBox="0 0 200 130"><rect width="200" height="130" {...brd} rx="4"/><rect x="8" y="8" width="184" height="50" {...ph}/><rect x="8" y="68" width="184" height="54" {...ph}/></svg>;
+  return null;
+};
+
+const FrameCard = ({frame,selected,onClick}) => (
+  <div onClick={onClick} style={{
+    display:'flex',flexDirection:'column',alignItems:'center',gap:18,cursor:'pointer',
+    padding:'28px 24px',borderRadius:16,
+    background:selected?`rgba(27,26,56,0.07)`:'transparent',
+    outline:selected?`3px solid ${N}`:'3px solid transparent',
+    transition:'all .2s',userSelect:'none'
+  }}>
+    <FrameSVG id={frame.id} sel={selected}/>
+    <div style={{fontWeight:800,fontSize:24,color:N}}>{frame.price.toLocaleString('vi-VN')}</div>
+  </div>
+);
+
+// ── PHOTO PLACEHOLDERS ─────────────────────────────────────────
+const PHOTOS = [
+  'linear-gradient(140deg,#667eea,#764ba2)',
+  'linear-gradient(140deg,#f093fb,#f5576c)',
+  'linear-gradient(140deg,#4facfe,#00f2fe)',
+  'linear-gradient(140deg,#43e97b,#38f9d7)',
+  'linear-gradient(140deg,#fa709a,#fee140)',
+  'linear-gradient(140deg,#a18cd1,#fbc2eb)',
+  'linear-gradient(140deg,#ffecd2,#fcb69f)',
+  'linear-gradient(140deg,#a1c4fd,#c2e9fb)',
+  'linear-gradient(140deg,#fd79a8,#c44569)',
+  'linear-gradient(140deg,#2d3436,#636e72)',
+];
+
+// ── SCREENS ────────────────────────────────────────────────────
+
+// 1. SPLASH
+const SplashScreen = ({onNext}) => (
+  <div className="screen" onClick={onNext} style={{cursor:'pointer',userSelect:'none'}}>
+    <Grain/>
+    <DiagAccents/>
+    <BracketTL/>
+    <Stars x={155} y={82}/>
+    <Stars x={1630} y={65} flip/>
+    <Stars x={220} y={700} size={90}/>
+    <div style={{position:'absolute',inset:0,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',zIndex:10,gap:0}}>
+      <svg width="230" height="210" viewBox="0 0 230 210" fill="none">
+        <ellipse cx="115" cy="168" rx="92" ry="24" stroke={N} strokeWidth="2.5" fill="none"/>
+        <path d="M75,165 Q73,108 82,86 Q94,58 115,56 Q136,58 148,86 Q157,108 155,165 Q136,182 115,182 Q94,182 75,165Z" fill={N}/>
+        <ellipse cx="115" cy="70" rx="50" ry="48" fill={N}/>
+        <path d="M72,45 L64,14 L94,38" fill={N}/>
+        <path d="M158,45 L166,14 L136,38" fill={N}/>
+      </svg>
+      <div style={{fontWeight:900,fontSize:112,color:N,letterSpacing:-5,lineHeight:1,marginTop:-8}}>stormick</div>
+      <div style={{display:'flex',alignItems:'baseline',gap:14,marginTop:40,letterSpacing:7}}>
+        <span style={{fontWeight:600,fontStyle:'italic',fontSize:42,color:N}}>TAP TO</span>
+        <span style={{fontWeight:900,fontSize:48,color:N}}>START</span>
+      </div>
+    </div>
+  </div>
+);
+
+// 2. FRAME SELECT
+const FrameSelectScreen = ({onNext,onPrev,selFrame,setSelFrame}) => (
+  <div className="screen">
+    <Grain/><BracketTL/><BracketBR/><StepBar cur={0}/>
+    <div style={{position:'absolute',top:88,left:110,zIndex:10}}>
+      <div style={{fontWeight:800,fontSize:60,color:N,lineHeight:1.1}}>Vui lòng chọn khung ảnh</div>
+      <div style={{fontWeight:400,fontStyle:'italic',fontSize:28,color:N,opacity:.45,marginTop:6}}>Select frame</div>
+    </div>
+    <div style={{position:'absolute',top:230,left:80,right:160,display:'flex',flexWrap:'wrap',gap:20,alignItems:'flex-end',zIndex:10}}>
+      {FRAMES.map(f=>(
+        <FrameCard key={f.id} frame={f} selected={selFrame?.id===f.id} onClick={()=>setSelFrame(f)}/>
+      ))}
+    </div>
+    {selFrame && (
+      <div onClick={onNext} style={{
+        position:'absolute',right:72,top:'50%',transform:'translateY(-50%)',
+        width:88,height:88,borderRadius:'50%',background:N,cursor:'pointer',
+        display:'flex',alignItems:'center',justifyContent:'center',zIndex:20,
+        boxShadow:'0 8px 32px rgba(27,26,56,.35)'
+      }}>
+        <svg width="30" height="30" viewBox="0 0 30 30" fill="none">
+          <path d="M9 5 L21 15 L9 25" stroke="#fff" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </div>
+    )}
+    <NavBtn label="Trước" sub="Before" onClick={onPrev} side="left"/>
+  </div>
+);
+
+// 3. PHOTO COUNT
+const PhotoCountScreen = ({onNext,onPrev,count,setCount,framePrice}) => {
+  const price = framePrice + Math.max(0,count-1)*40000;
+  return (
+    <div className="screen">
+      <Grain/><StepBar cur={1}/>
+      <Stars x={1640} y={55} size={88} flip/>
+      <Stars x={110} y={740} size={80}/>
+      <div style={{position:'absolute',inset:0,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:52,zIndex:10}}>
+        <div style={{textAlign:'center'}}>
+          <div style={{fontWeight:800,fontSize:60,color:N,lineHeight:1.1}}>Vui lòng chọn số lượng ảnh</div>
+          <div style={{fontWeight:400,fontStyle:'italic',fontSize:28,color:N,opacity:.45,marginTop:6}}>Select number of photos</div>
+        </div>
+        <div style={{display:'flex',alignItems:'center',gap:64}}>
+          <div onClick={()=>setCount(c=>Math.max(1,c-1))} style={{width:96,height:96,borderRadius:'50%',border:`3.5px solid ${N}`,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',transition:'all .15s'}}>
+            <span style={{fontSize:52,color:N,lineHeight:1,marginTop:-4}}>−</span>
+          </div>
+          <div style={{width:192,height:192,borderRadius:'50%',background:N,display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 8px 40px rgba(27,26,56,.3)'}}>
+            <span style={{fontSize:100,fontWeight:900,color:'#fff',lineHeight:1}}>{count}</span>
+          </div>
+          <div onClick={()=>setCount(c=>Math.min(5,c+1))} style={{width:96,height:96,borderRadius:'50%',border:`3.5px solid ${N}`,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',transition:'all .15s'}}>
+            <span style={{fontSize:52,color:N,lineHeight:1,marginTop:-4}}>+</span>
+          </div>
+        </div>
+        <div style={{background:N,borderRadius:10,padding:'18px 72px',boxShadow:'0 4px 24px rgba(27,26,56,.25)'}}>
+          <span style={{fontSize:46,fontWeight:800,color:'#fff'}}>{fmt(price)}</span>
+        </div>
+        <div style={{fontSize:20,color:N,opacity:.4,textAlign:'center'}}>
+          Giá cơ bản {fmt(framePrice)} + {count>1?`${count-1} bản in thêm (${fmt(40000)}/bản)`:'1 bản in'}
+        </div>
+      </div>
+      <NavBtn label="Trước" sub="Before" onClick={onPrev} side="left"/>
+      <NavBtn label="Sau" sub="After" onClick={onNext} side="right"/>
+    </div>
+  );
+};
+
+// 4. PAYMENT — coupon codes
+const COUPONS = {
+  'STORMICK10': {type:'percent', value:10,  label:'Giảm 10%'},
+  'BEOBEO':     {type:'fixed',   value:20000, label:'Giảm 20.000đ'},
+  'VIP50K':     {type:'fixed',   value:50000, label:'Giảm 50.000đ'},
+  'STORMICK20': {type:'percent', value:20,  label:'Giảm 20%'},
+};
+
+const CouponOverlay = ({baseTotal, onApply, onClose}) => {
+  const [code,setCode]     = useState('');
+  const [status,setStatus] = useState('idle'); // idle | checking | valid | invalid
+  const [result,setResult] = useState(null);
+  const inputRef = useRef(null);
+  useEffect(()=>{ setTimeout(()=>inputRef.current&&inputRef.current.focus(),100); },[]);
+
+  const verify = () => {
+    if(!code.trim()||status==='checking') return;
+    setStatus('checking');
+    setTimeout(()=>{
+      const found = COUPONS[code.trim().toUpperCase()];
+      if(found){
+        const amt = found.type==='percent' ? Math.round(baseTotal*found.value/100) : found.value;
+        const r = {...found, code:code.trim().toUpperCase(), discountAmt:amt};
+        setResult(r);
+        setStatus('valid');
+        setTimeout(()=>onApply(r), 1200);
+      } else {
+        setStatus('invalid');
+      }
+    },1100);
+  };
+
+  const statusColors = {idle:'transparent',checking:'transparent',valid:'#1E7A45',invalid:'#D32F2F'};
+  const statusMsg    = {idle:'',checking:'Đang kiểm tra…',valid:`✓ Áp dụng thành công! Giảm ${result?fmt(result.discountAmt):''}`,invalid:'❌ Mã không hợp lệ. Vui lòng thử lại!'};
+
+  // On-screen keypad
+  const keys = ['1','2','3','4','5','6','7','8','9','0','Q','W','E','R','T','Y','U','I','O','P','A','S','D','F','G','H','J','K','L','Z','X','C','V','B','N','M','⌫','CLEAR'];
+  const handleKey = k => {
+    if(k==='⌫') { setCode(c=>c.slice(0,-1)); setStatus('idle'); }
+    else if(k==='CLEAR') { setCode(''); setStatus('idle'); }
+    else if(code.length<12) { setCode(c=>c+k); setStatus('idle'); }
+  };
+
+  return (
+    <div style={{position:'absolute',inset:0,background:'rgba(7,7,20,.72)',zIndex:50,display:'flex',alignItems:'center',justifyContent:'center'}} onClick={e=>e.stopPropagation()}>
+      <div style={{background:C,borderRadius:24,padding:'52px 64px 48px',width:900,position:'relative',boxShadow:'0 24px 80px rgba(0,0,0,.5)'}}>
+        {/* Close */}
+        <div onClick={onClose} style={{position:'absolute',top:28,right:36,width:52,height:52,borderRadius:'50%',border:`2.5px solid ${N}`,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',fontSize:22,color:N,fontWeight:700}}>✕</div>
+
+        <div style={{fontWeight:800,fontSize:50,color:N,lineHeight:1.1}}>Bạn có voucher không?</div>
+        <div style={{fontStyle:'italic',fontSize:22,color:N,opacity:.4,marginTop:6,marginBottom:40}}>Do you have a voucher?</div>
+
+        {/* Code display */}
+        <div style={{
+          width:'100%',padding:'18px 28px',border:`3px solid ${status==='valid'?'#1E7A45':status==='invalid'?'#D32F2F':N}`,
+          borderRadius:12,fontSize:42,fontWeight:900,color:N,letterSpacing:8,
+          minHeight:82,background:'rgba(27,26,56,.04)',transition:'border-color .3s',
+          display:'flex',alignItems:'center',gap:4,userSelect:'none'
+        }}>
+          <span>{code || <span style={{opacity:.25,fontSize:28,fontWeight:400,letterSpacing:2}}>Nhập mã voucher…</span>}</span>
+          {(status==='idle'||status==='invalid')&&code.length>0&&<span style={{display:'inline-block',width:2,height:40,background:N,animation:'blink 1s step-end infinite',marginLeft:4}}/>}
+        </div>
+        <style>{`@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}`}</style>
+
+        {/* Status */}
+        <div style={{minHeight:36,marginTop:12,fontSize:22,fontWeight:600,color:statusColors[status]||N,opacity:status==='checking'?.5:1,transition:'color .3s'}}>
+          {statusMsg[status]}
+        </div>
+
+        {/* Keypad */}
+        <div style={{display:'grid',gridTemplateColumns:'repeat(10,1fr)',gap:8,marginTop:20}}>
+          {keys.map(k=>(
+            <div key={k} onClick={()=>handleKey(k)} style={{
+              height:58,borderRadius:8,display:'flex',alignItems:'center',justifyContent:'center',
+              background: k==='⌫'||k==='CLEAR' ? 'rgba(27,26,56,.12)' : 'rgba(27,26,56,.07)',
+              border:`1.5px solid rgba(27,26,56,.15)`,cursor:'pointer',
+              fontSize: k==='CLEAR'?14:20,fontWeight:700,color:N,
+              gridColumn: k==='CLEAR'?'span 2':undefined,
+              transition:'background .1s',userSelect:'none'
+            }}>{k}</div>
+          ))}
+        </div>
+
+        {/* Confirm btn */}
+        <button onClick={verify} disabled={!code||status==='checking'||status==='valid'} style={{
+          marginTop:28,width:'100%',padding:'20px',background:status==='valid'?'#1E7A45':N,
+          border:'none',borderRadius:12,fontSize:26,fontWeight:700,color:'#fff',
+          cursor:(!code||status==='checking'||status==='valid')?'default':'pointer',
+          opacity:!code||status==='checking'?.6:1,transition:'all .3s',fontFamily:'Be Vietnam Pro'
+        }}>
+          {status==='checking'?'Đang kiểm tra…':status==='valid'?'✓ Thành công!':'Xác nhận / Verify'}
+        </button>
+
+        {/* Hint */}
+        <div style={{marginTop:16,fontSize:16,color:N,opacity:.3,textAlign:'center'}}>
+          Gợi ý thử: STORMICK10 · BEOBEO · VIP50K · STORMICK20
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const PaymentScreen = ({onNext,onPrev,total,inserted,setInserted}) => {
+  const [showCoupon,setShowCoupon]       = useState(false);
+  const [appliedCoupon,setAppliedCoupon] = useState(null);
+  const discount  = appliedCoupon ? appliedCoupon.discountAmt : 0;
+  const netTotal  = Math.max(0, total - discount);
+  const paid      = inserted >= netTotal;
+  const change    = Math.max(0, inserted - netTotal);
+
+  useEffect(()=>{
+    if(paid){const t=setTimeout(onNext,1800);return()=>clearTimeout(t);}
+  },[paid]);
+
+  const addCash = amt => setInserted(a=>a+amt);
+
+  const handleApply = (coupon) => {
+    setAppliedCoupon(coupon);
+    setShowCoupon(false);
+  };
+
+  return (
+    <div className="screen">
+      <Grain/><BracketTL/><StepBar cur={2}/>
+      <div style={{position:'absolute',right:-60,top:'40%',transform:'translateY(-50%) rotate(-90deg)',fontSize:320,fontWeight:900,fontStyle:'italic',color:'rgba(27,26,56,0.055)',lineHeight:1,pointerEvents:'none',zIndex:1,letterSpacing:-10,userSelect:'none'}}>CASH</div>
+
+      <div style={{position:'absolute',top:88,left:110,zIndex:10}}>
+        <div style={{fontWeight:800,fontSize:60,color:N,lineHeight:1.1}}>Thanh toán tiền mặt</div>
+        <div style={{fontWeight:400,fontStyle:'italic',fontSize:28,color:N,opacity:.45,marginTop:6}}>Cash</div>
+      </div>
+
+      <div style={{position:'absolute',top:240,left:110,display:'flex',gap:90,alignItems:'flex-start',zIndex:10}}>
+        {/* Amount due */}
+        <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:20}}>
+          <div style={{textAlign:'center'}}>
+            <div style={{fontWeight:700,fontSize:26,color:N}}>Số tiền thanh toán</div>
+            <div style={{fontStyle:'italic',fontSize:17,color:N,opacity:.45}}>Cash</div>
+          </div>
+          <div style={{width:210,height:210,borderRadius:'50%',background:N,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',boxShadow:'0 8px 40px rgba(27,26,56,.3)',position:'relative'}}>
+            {discount>0 && (
+              <span style={{fontSize:18,color:'rgba(255,255,255,.45)',textDecoration:'line-through',marginBottom:2}}>{total.toLocaleString('vi-VN')}</span>
+            )}
+            <span style={{fontSize:discount>0?30:38,fontWeight:800,color:'#fff',textAlign:'center',lineHeight:1}}>{netTotal.toLocaleString('vi-VN')}</span>
+            {discount>0 && (
+              <span style={{fontSize:15,color:'#7EE8A2',fontWeight:700,marginTop:4}}>−{fmt(discount)}</span>
+            )}
+          </div>
+          {/* Voucher button */}
+          {!paid && (
+            <div onClick={()=>setShowCoupon(true)} style={{
+              display:'flex',alignItems:'center',gap:10,padding:'12px 24px',
+              border:`2.5px dashed ${appliedCoupon?'#1E7A45':N}`,borderRadius:40,
+              cursor:'pointer',background:appliedCoupon?'rgba(30,122,69,.08)':'transparent',
+              transition:'all .2s',maxWidth:300
+            }}>
+              <span style={{fontSize:22}}>🎫</span>
+              <div>
+                {appliedCoupon
+                  ? <div style={{fontSize:16,fontWeight:700,color:'#1E7A45',lineHeight:1.2}}>{appliedCoupon.code}<br/><span style={{fontWeight:500,fontSize:14}}>{appliedCoupon.label}</span></div>
+                  : <div style={{fontSize:17,fontWeight:700,color:N}}>Bạn có voucher không?</div>
+                }
+              </div>
+              {appliedCoupon && (
+                <div onClick={e=>{e.stopPropagation();setAppliedCoupon(null);}} style={{marginLeft:6,fontSize:16,color:'#999',cursor:'pointer',fontWeight:700}}>✕</div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Inserted */}
+        <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:20}}>
+          <div style={{textAlign:'center'}}>
+            <div style={{fontWeight:700,fontSize:26,color:N}}>Số tiền đã nộp vào</div>
+            <div style={{fontStyle:'italic',fontSize:17,color:N,opacity:.45}}>Add Amount</div>
+          </div>
+          <div style={{width:210,height:210,borderRadius:'50%',background:paid?'#1E7A45':N,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',transition:'background .6s',boxShadow:'0 8px 40px rgba(27,26,56,.3)'}}>
+            <span style={{fontSize:36,fontWeight:800,color:'#fff'}}>{inserted.toLocaleString('vi-VN')}</span>
+            {paid&&change>0&&<span style={{fontSize:15,color:'rgba(255,255,255,.7)',marginTop:4}}>Thối: {fmt(change)}</span>}
+          </div>
+        </div>
+
+        {/* Denominations */}
+        <div style={{display:'flex',flexDirection:'column',gap:14,marginTop:16}}>
+          <div style={{fontWeight:600,fontSize:19,color:N,opacity:.5,marginBottom:4}}>Bỏ tiền vào (giả lập):</div>
+          {[10000,20000,50000,100000,200000].map(amt=>(
+            <button key={amt} onClick={()=>addCash(amt)} disabled={paid} style={{
+              padding:'12px 40px',background:'transparent',border:`2.5px solid ${N}`,
+              borderRadius:9,fontSize:21,fontWeight:700,color:N,cursor:paid?'default':'pointer',
+              transition:'all .2s',opacity:paid?.35:1,fontFamily:'Be Vietnam Pro'
+            }}>+ {amt.toLocaleString('vi-VN')}đ</button>
+          ))}
+        </div>
+      </div>
+
+      {/* CTA */}
+      <div style={{position:'absolute',bottom:170,left:110,zIndex:10}}>
+        {paid
+          ? <div style={{background:'#1E7A45',borderRadius:10,padding:'20px 64px',display:'inline-flex',alignItems:'center',gap:14}}>
+              <span style={{fontSize:32,fontWeight:700,color:'#fff'}}>✓ Thanh toán thành công! Đang chuyển tiếp…</span>
+            </div>
+          : <div style={{background:N,borderRadius:10,padding:'20px 64px',cursor:'pointer'}} onClick={()=>setInserted(netTotal)}>
+              <span style={{fontSize:32,fontWeight:700,color:'#fff'}}>Vui lòng bỏ tiền vào máy</span>
+            </div>
+        }
+      </div>
+
+      <NavBtn label="Trước" sub="Before" onClick={onPrev} side="left"/>
+
+      {/* Coupon overlay */}
+      {showCoupon && <CouponOverlay baseTotal={total} onApply={handleApply} onClose={()=>setShowCoupon(false)}/>}
+    </div>
+  );
+};
+
+// 5. READY GO
+const ReadyGoScreen = ({onNext,frame,count}) => {
+  const total = frame.slots * count;
+  return (
+    <div className="screen">
+      <Grain/><StepBar cur={3}/>
+      <Stars x={1590} y={55} size={96} flip/>
+      <Stars x={820} y={660} size={64}/>
+      <div style={{position:'absolute',top:110,left:110,zIndex:10}}>
+        <div style={{fontWeight:900,fontStyle:'italic',fontSize:148,color:N,lineHeight:.92,letterSpacing:-4}}>READY GO!</div>
+        <div style={{fontWeight:900,fontStyle:'italic',fontSize:148,color:'rgba(27,26,56,.1)',lineHeight:.92,letterSpacing:-4,marginTop:10}}>READY GO!</div>
+        <div style={{display:'flex',flexDirection:'column',gap:16,marginTop:60}}>
+          <div style={{fontSize:38,fontWeight:700,color:N}}>Số lần chụp <span style={{fontSize:52,fontWeight:900}}>{total} lần</span></div>
+          <div style={{fontSize:38,fontWeight:700,color:N}}>Thời gian chụp 1 lần <span style={{fontSize:52,fontWeight:900}}>10 Giây</span></div>
+          <div style={{fontSize:26,fontWeight:500,color:N,opacity:.7}}>Tự động chụp khi vượt quá số giây</div>
+          <div style={{fontSize:17,color:N,opacity:.4,marginTop:4}}>
+            Number of shooting <b>{total} times</b> / time of shooting <b>10 seconds</b> / Automatic shooting when exceeding <b>10 seconds</b>
+          </div>
+        </div>
+        <button onClick={onNext} style={{
+          marginTop:48,padding:'22px 88px',background:N,border:'none',borderRadius:10,
+          cursor:'pointer',textAlign:'center',boxShadow:'0 6px 30px rgba(27,26,56,.3)'
+        }}>
+          <div style={{fontSize:30,fontWeight:700,color:'#fff'}}>Chuẩn bị chụp</div>
+          <div style={{fontSize:18,color:'rgba(255,255,255,.5)'}}>Get ready</div>
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// 6. COUNTDOWN
+const CountdownScreen = ({shotNum,totalShots,onDone}) => {
+  const [n,setN] = useState(3);
+  useEffect(()=>{
+    if(n===0){const t=setTimeout(onDone,300);return()=>clearTimeout(t);}
+    const t=setTimeout(()=>setN(x=>x-1),1000);
+    return()=>clearTimeout(t);
+  },[n]);
+  const msg = n===3?'GET READY…':n===2?'ALMOST…':n===1?'SMILE! 😄':'';
+  return (
+    <div className="screen" style={{background:'#090910'}}>
+      <style>{`@keyframes popIn{0%{transform:scale(.6);opacity:0}50%{transform:scale(1.08)}100%{transform:scale(1);opacity:1}}`}</style>
+      <div style={{position:'absolute',top:40,right:60,background:'rgba(255,255,255,.12)',borderRadius:12,padding:'12px 32px',zIndex:10}}>
+        <span style={{fontSize:36,fontWeight:800,color:'#fff'}}>{shotNum} / {totalShots}</span>
+      </div>
+      <div style={{position:'absolute',inset:0,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',zIndex:10,gap:24}}>
+        <div key={n} style={{fontSize:280,fontWeight:900,fontStyle:'italic',color:'#fff',lineHeight:1,animation:'popIn .35s ease-out'}}>
+          {n===0?'📸':n}
+        </div>
+        <div style={{fontSize:30,fontWeight:500,color:'rgba(255,255,255,.45)',letterSpacing:5}}>{msg}</div>
+      </div>
+    </div>
+  );
+};
+
+// 7. CAPTURE
+const CaptureScreen = ({shotNum,totalShots,onCapture}) => {
+  const [timer,setTimer] = useState(10);
+  const [flash,setFlash] = useState(false);
+  const captured = useRef(false);
+  const doCapture = useCallback(()=>{
+    if(captured.current)return;
+    captured.current=true;
+    setFlash(true);
+    setTimeout(()=>{setFlash(false);onCapture();},500);
+  },[onCapture]);
+  useEffect(()=>{
+    captured.current=false;
+    setTimer(10);
+    setFlash(false);
+  },[shotNum]);
+  useEffect(()=>{
+    if(timer<=0){doCapture();return;}
+    const t=setTimeout(()=>setTimer(x=>x-1),1000);
+    return()=>clearTimeout(t);
+  },[timer]);
+  const r=46,circ=2*Math.PI*r,dash=circ-(circ*(10-timer)/10);
+  return (
+    <div className="screen" style={{background:'#07070f',cursor:'pointer'}} onClick={doCapture}>
+      {flash&&<div style={{position:'absolute',inset:0,background:'#fff',zIndex:100,pointerEvents:'none'}}/>}
+      {/* Counter top-right */}
+      <div style={{position:'absolute',top:32,right:44,display:'flex',alignItems:'center',gap:20,zIndex:20}}>
+        <svg width="110" height="110" viewBox="0 0 110 110">
+          <circle cx="55" cy="55" r={r} fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="6"/>
+          <circle cx="55" cy="55" r={r} fill="none" stroke="#fff" strokeWidth="6"
+            strokeDasharray={circ} strokeDashoffset={dash} strokeLinecap="round"
+            transform="rotate(-90 55 55)" style={{transition:'stroke-dashoffset 1s linear'}}/>
+          <text x="55" y="62" textAnchor="middle" fill="#fff" fontSize="26" fontWeight="800" fontFamily="Be Vietnam Pro">{timer}</text>
+        </svg>
+        <div style={{background:'rgba(255,255,255,.14)',borderRadius:10,padding:'12px 28px'}}>
+          <span style={{fontSize:38,fontWeight:800,color:'#fff'}}>{shotNum}/{totalShots}</span>
+        </div>
+      </div>
+      {/* Viewfinder */}
+      <div style={{position:'absolute',left:'50%',top:'50%',transform:'translate(-50%,-52%)',width:980,height:660,background:'#1a1a2e',borderRadius:10,overflow:'hidden',zIndex:10}}>
+        <div style={{position:'absolute',inset:0,background:'linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%)',display:'flex',alignItems:'center',justifyContent:'center',flexDirection:'column',gap:16}}>
+          <div style={{fontSize:72,opacity:.2}}>📷</div>
+          <div style={{fontSize:20,color:'rgba(255,255,255,.2)',letterSpacing:4}}>CAMERA PREVIEW</div>
+        </div>
+        {[['top','left'],['top','right'],['bottom','left'],['bottom','right']].map(([v,h],i)=>(
+          <div key={i} style={{position:'absolute',[v]:18,[h]:18,width:44,height:44,
+            borderTop:v==='top'?'3px solid rgba(255,255,255,.4)':'none',
+            borderBottom:v==='bottom'?'3px solid rgba(255,255,255,.4)':'none',
+            borderLeft:h==='left'?'3px solid rgba(255,255,255,.4)':'none',
+            borderRight:h==='right'?'3px solid rgba(255,255,255,.4)':'none'}}/>
+        ))}
+      </div>
+      {/* Bottom */}
+      <div style={{position:'absolute',bottom:70,left:0,right:0,textAlign:'center',zIndex:20}}>
+        <div style={{fontSize:28,fontWeight:600,color:'rgba(255,255,255,.85)'}}>Nhìn vào ống kính và nhấn nút chụp</div>
+        <div style={{fontSize:18,color:'rgba(255,255,255,.4)',marginTop:4}}>Look at the lens and press the shutter</div>
+      </div>
+      {/* Shutter */}
+      <div onClick={e=>{e.stopPropagation();doCapture();}} style={{
+        position:'absolute',bottom:70,left:'50%',transform:'translateX(360px)',
+        width:96,height:96,borderRadius:'50%',background:'#fff',
+        border:'7px solid rgba(255,255,255,.35)',cursor:'pointer',zIndex:20
+      }}/>
+    </div>
+  );
+};
+
+// 8. PHOTO SELECT
+const PhotoSelectScreen = ({onNext,totalShots,neededSlots}) => {
+  const [sel,setSel] = useState([]);
+  const toggle = i => setSel(prev=>{
+    if(prev.includes(i))return prev.filter(x=>x!==i);
+    if(prev.length>=neededSlots)return[...prev.slice(1),i];
+    return[...prev,i];
+  });
+  const ready = sel.length===neededSlots;
+  return (
+    <div className="screen">
+      <Grain/><StepBar cur={5}/>
+      <div style={{position:'absolute',top:50,left:100,right:340,zIndex:10}}>
+        <div style={{fontWeight:800,fontSize:46,color:N,lineHeight:1.1}}>
+          Vui lòng chọn ảnh <span style={{fontWeight:400,fontSize:30,opacity:.4}}>(Có thể chọn trùng ảnh)</span>
+        </div>
+        <div style={{fontStyle:'italic',fontSize:22,color:N,opacity:.4,marginTop:6}}>Select Photo (Duplicate Selection)</div>
+      </div>
+      <div style={{position:'absolute',top:170,left:60,right:370,display:'flex',flexWrap:'wrap',gap:18,zIndex:10,alignContent:'flex-start'}}>
+        {Array.from({length:totalShots}).map((_,i)=>(
+          <div key={i} onClick={()=>toggle(i)} style={{
+            width:196,height:148,borderRadius:10,background:PHOTOS[i%PHOTOS.length],
+            cursor:'pointer',position:'relative',overflow:'hidden',
+            outline:sel.includes(i)?`4px solid ${N}`:'4px solid transparent',
+            transition:'outline .15s',flexShrink:0
+          }}>
+            {sel.includes(i)&&(
+              <div style={{position:'absolute',top:8,right:8,background:N,borderRadius:'50%',width:30,height:30,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                <span style={{color:'#fff',fontWeight:800,fontSize:15}}>{sel.indexOf(i)+1}</span>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+      {/* Strip preview right */}
+      <div style={{position:'absolute',right:50,top:140,width:270,zIndex:10}}>
+        <div style={{fontWeight:600,fontSize:17,color:N,opacity:.45,marginBottom:12,lineHeight:1.4}}>Nhấn vào ảnh nếu muốn huỷ<br/><em>Tap the frame to cancel</em></div>
+        <div style={{display:'flex',flexDirection:'column',gap:8,background:'#fff',padding:10,borderRadius:10,boxShadow:'0 4px 24px rgba(0,0,0,.1)'}}>
+          {Array.from({length:neededSlots}).map((_,i)=>{
+            const idx=sel[i];
+            return <div key={i} style={{height:Math.max(90,Math.floor(540/neededSlots)),borderRadius:6,background:idx!==undefined?PHOTOS[idx%PHOTOS.length]:'#E0DDD6',transition:'background .3s'}}/>;
+          })}
+        </div>
+        {/* Flip btn */}
+        <div style={{marginTop:20,display:'flex',alignItems:'center',gap:10,padding:'12px 16px',border:`2px solid ${N}`,borderRadius:8,cursor:'pointer'}}>
+          <span style={{fontSize:22}}>↔</span>
+          <div>
+            <div style={{fontSize:16,fontWeight:700,color:N}}>Lật trái/phải</div>
+            <div style={{fontSize:12,color:N,opacity:.45}}>Flip Horizontal / Vertical</div>
+          </div>
+        </div>
+      </div>
+      {ready && <NavBtn label="Sau" sub="After" onClick={()=>onNext(sel)} side="right"/>}
+    </div>
+  );
+};
+
+// 9. FILTER + BG
+const BG_OPTS = [
+  {label:'STAY\nCOOL',bg:'#F0EDE6',textColor:'#333',border:true},
+  {label:'',bg:'linear-gradient(135deg,#8e24aa,#e040fb)'},
+  {label:'',bg:'linear-gradient(135deg,#26a69a,#f9a825)'},
+  {label:'',bg:'linear-gradient(135deg,#667eea,#764ba2)'},
+  {label:'BELIEVE\nLOVE',bg:'linear-gradient(135deg,#e53935,#ff8f00)',textColor:'rgba(255,255,255,.85)'},
+  {label:'',bg:'linear-gradient(135deg,#f06292,#ce93d8)'},
+  {label:'',bg:'radial-gradient(circle,#f48fb1,#ad1457)'},
+  {label:'',bg:'radial-gradient(circle,#212121,#000)'},
+  {label:'',bg:'radial-gradient(circle,#cfd8dc,#90a4ae)'},
+];
+
+const FilterSelectScreen = ({onNext,selPhotos}) => {
+  const [filter,setFilter] = useState('none');
+  const [bg,setBg] = useState(0);
+  const [flipped,setFlipped] = useState(false);
+  const fStyle = filter==='gray'?'grayscale(100%)':filter==='bright'?'brightness(1.35)':'none';
+  const bgStyle = BG_OPTS[bg].bg.startsWith('linear')||BG_OPTS[bg].bg.startsWith('radial')?{backgroundImage:BG_OPTS[bg].bg}:{backgroundColor:BG_OPTS[bg].bg};
+  return (
+    <div className="screen">
+      <Grain/><StepBar cur={6}/>
+      {/* Left — filter */}
+      <div style={{position:'absolute',top:80,left:80,width:340,zIndex:10}}>
+        <div style={{fontWeight:800,fontSize:42,color:N}}>Chọn filter</div>
+        <div style={{fontStyle:'italic',fontSize:20,color:N,opacity:.4,marginBottom:36}}>Select Filter</div>
+        <div style={{display:'flex',gap:28,marginBottom:12}}>
+          {[{id:'bright',icon:'☀',label:'Độ sáng',sub:'Brightness'},{id:'gray',icon:'◑',label:'Đen trắng',sub:'Gray-scale'}].map(f=>(
+            <div key={f.id} style={{display:'flex',flexDirection:'column',alignItems:'center',gap:10}}>
+              <div onClick={()=>setFilter(filter===f.id?'none':f.id)} style={{
+                width:120,height:120,borderRadius:'50%',
+                border:`3.5px solid ${filter===f.id?N:'#CCC'}`,
+                background:filter===f.id?N:'#fff',
+                display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',transition:'all .2s'
+              }}>
+                <span style={{fontSize:40,filter:'grayscale(1)',color:filter===f.id?'#fff':N}}>{f.icon}</span>
+              </div>
+              <div style={{textAlign:'center'}}>
+                <div style={{fontSize:16,fontWeight:700,color:N}}>{f.label}</div>
+                <div style={{fontSize:13,color:N,opacity:.45}}>{f.sub}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div onClick={()=>setFlipped(f=>!f)} style={{
+          marginTop:32,display:'flex',alignItems:'center',gap:14,padding:'14px 22px',
+          border:`2.5px solid ${N}`,borderRadius:10,cursor:'pointer',
+          background:flipped?`rgba(27,26,56,.06)`:'transparent',transition:'all .2s'
+        }}>
+          <span style={{fontSize:26,fontWeight:700,color:N}}>↔</span>
+          <div>
+            <div style={{fontSize:18,fontWeight:700,color:N}}>Lật trái/phải</div>
+            <div style={{fontSize:14,color:N,opacity:.45}}>Flip Horizontal / Vertical</div>
+          </div>
+        </div>
+      </div>
+      {/* Center — strip preview */}
+      <div style={{position:'absolute',left:'50%',top:'50%',transform:'translate(-50%,-50%)',zIndex:10}}>
+        <div style={{
+          ...bgStyle,
+          padding:14,borderRadius:10,
+          display:'flex',flexDirection:'column',gap:8,
+          transform:flipped?'scaleX(-1)':'scaleX(1)',
+          transition:'transform .4s',
+          filter:fStyle,
+          boxShadow:'0 8px 40px rgba(0,0,0,.2)',
+          minWidth:220
+        }}>
+          {selPhotos.slice(0,4).map((idx,i)=>(
+            <div key={i} style={{width:200,height:110,borderRadius:6,background:PHOTOS[idx%PHOTOS.length]}}/>
+          ))}
+        </div>
+      </div>
+      {/* Right — backgrounds */}
+      <div style={{position:'absolute',top:80,right:80,width:420,zIndex:10}}>
+        <div style={{fontWeight:800,fontSize:42,color:N}}>Chọn nền</div>
+        <div style={{fontStyle:'italic',fontSize:20,color:N,opacity:.4,marginBottom:32}}>Select Background</div>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:18}}>
+          {BG_OPTS.map((b,i)=>(
+            <div key={i} onClick={()=>setBg(i)} style={{
+              width:112,height:112,borderRadius:'50%',cursor:'pointer',
+              ...( b.bg.startsWith('linear')||b.bg.startsWith('radial')?{backgroundImage:b.bg}:{backgroundColor:b.bg}),
+              outline:bg===i?`4.5px solid ${N}`:'4.5px solid transparent',
+              outlineOffset:3,transition:'outline .2s',
+              display:'flex',alignItems:'center',justifyContent:'center',
+              fontSize:12,fontWeight:800,color:b.textColor||'transparent',
+              textAlign:'center',lineHeight:1.3,whiteSpace:'pre-line'
+            }}>{b.label}</div>
+          ))}
+        </div>
+        <div onClick={onNext} style={{
+          marginTop:44,width:112,height:112,borderRadius:'50%',background:N,
+          display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',
+          cursor:'pointer',marginLeft:'auto',boxShadow:'0 6px 28px rgba(27,26,56,.35)'
+        }}>
+          <span style={{fontSize:28,fontWeight:800,color:'#fff'}}>In</span>
+          <span style={{fontSize:14,color:'rgba(255,255,255,.5)'}}>Print</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// 10. PRINTING
+const PrintingScreen = ({onDone,selPhotos}) => {
+  const [prog,setProg] = useState(0);
+  const [done,setDone] = useState(false);
+  useEffect(()=>{
+    const iv=setInterval(()=>{
+      setProg(p=>{
+        if(p>=100){clearInterval(iv);setDone(true);return 100;}
+        return p+1.5;
+      });
+    },60);
+    return()=>clearInterval(iv);
+  },[]);
+  // Simple QR pattern
+  const qrCells = [];
+  const qrSeed = [[1,1,1,0,1,1,1],[1,0,1,0,1,0,1],[1,0,1,0,1,0,1],[0,0,0,0,0,0,0],[1,0,1,0,1,1,1],[1,0,0,0,0,0,1],[1,1,1,0,1,1,1]];
+  for(let r=0;r<7;r++)for(let c=0;c<7;c++)if(qrSeed[r][c])qrCells.push({r,c});
+  const inner=[[1,1,1],[1,1,1],[1,1,1]];
+  const rndCells=[];
+  for(let r=0;r<12;r++)for(let c=0;c<12;c++)if(Math.abs(r-3)<3&&Math.abs(c-3)<3){}else if((r+c*3+r*c)%3!==0)rndCells.push({r,c});
+  return (
+    <div className="screen">
+      <Grain/><StepBar cur={7}/>
+      <Stars x={1540} y={55} size={80} flip/>
+      <div style={{position:'absolute',top:80,left:110,zIndex:10}}>
+        <div style={{fontWeight:800,fontSize:72,color:N,lineHeight:1}}>{done?'In xong rồi! 🎉':'Đang in ảnh'}</div>
+        <div style={{fontStyle:'italic',fontSize:30,color:N,opacity:.4,marginTop:6}}>Printing</div>
+      </div>
+      <div style={{position:'absolute',top:240,left:110,zIndex:10}}>
+        {/* QR */}
+        <div style={{width:230,height:230,background:N,borderRadius:14,display:'flex',alignItems:'center',justifyContent:'center',marginBottom:28,boxShadow:'0 6px 32px rgba(27,26,56,.3)'}}>
+          <svg width="180" height="180" viewBox="0 0 180 180">
+            {qrCells.map(({r,c})=><rect key={`${r}-${c}`} x={c*22+4} y={r*22+4} width="18" height="18" fill="#fff" rx="2"/>)}
+            {rndCells.map(({r,c})=><rect key={`rnd-${r}-${c}`} x={c*12+2+60} y={r*12+2+60} width="9" height="9" fill="#fff" rx="1"/>)}
+            {inner.map((row,ri)=>row.map((v,ci)=>v?<rect key={`in-${ri}-${ci}`} x={ci*7+7+22*2+4} y={ri*7+7+22*2+4} width="5" height="5" fill={N} rx="1"/>:null))}
+          </svg>
+        </div>
+        {/* Progress */}
+        <div style={{width:440,marginBottom:16}}>
+          <div style={{height:9,background:'rgba(27,26,56,.14)',borderRadius:5,overflow:'hidden'}}>
+            <div style={{height:'100%',width:`${prog}%`,background:N,borderRadius:5,transition:'width .08s linear'}}/>
+          </div>
+          <div style={{fontSize:20,fontWeight:600,color:N,opacity:.5,marginTop:8}}>{Math.floor(prog)}%</div>
+        </div>
+        <div style={{fontWeight:700,fontSize:30,color:N,lineHeight:1.5}}>Đang tải mã QR</div>
+        <div style={{fontWeight:700,fontSize:30,color:N}}>Tải ảnh và video về điện thoại</div>
+        <div style={{fontSize:18,color:N,opacity:.4,marginTop:6}}>Loading QR code / Download Photos and Videos</div>
+      </div>
+      {/* Strip preview right */}
+      <div style={{position:'absolute',right:100,top:150,width:210,zIndex:10}}>
+        <div style={{background:'#fff',padding:10,borderRadius:10,boxShadow:'0 6px 36px rgba(0,0,0,.13)',display:'flex',flexDirection:'column',gap:6}}>
+          {selPhotos.slice(0,4).map((idx,i)=>(
+            <div key={i} style={{height:108,borderRadius:5,background:PHOTOS[idx%PHOTOS.length]}}/>
+          ))}
+        </div>
+      </div>
+      {done && <NavBtn label="Kết thúc" sub="End" onClick={onDone} side="right"/>}
+    </div>
+  );
+};
+
+// ── APP ────────────────────────────────────────────────────────
+const App = () => {
+  const [screen,setScreen] = useState('splash');
+  const [selFrame,setSelFrame] = useState(null);
+  const [count,setCount] = useState(2);
+  const [inserted,setInserted] = useState(0);
+  const [shotNum,setShotNum] = useState(1);
+  const [capturing,setCapturing] = useState(false); // false=countdown, true=shoot
+  const [selPhotos,setSelPhotos] = useState([0,1,2,3]);
+
+  const total = selFrame ? selFrame.price + Math.max(0,count-1)*40000 : 0;
+  const totalShots = selFrame ? selFrame.slots * count : 0;
+  const neededSlots = selFrame ? selFrame.slots : 4;
+
+  useEffect(()=>{
+    const el=document.getElementById('stage');
+    const scale=()=>{
+      const s=Math.min(window.innerWidth/W,window.innerHeight/H);
+      el.style.transform=`scale(${s})`;
+      el.style.left=`${(window.innerWidth-W*s)/2}px`;
+      el.style.top=`${(window.innerHeight-H*s)/2}px`;
+    };
+    scale();
+    window.addEventListener('resize',scale);
+    return()=>window.removeEventListener('resize',scale);
+  },[]);
+
+  const go = s => setScreen(s);
+  const reset = () => { setSelFrame(null);setCount(2);setInserted(0);setShotNum(1);setCapturing(false);setSelPhotos([0,1,2,3]);go('splash'); };
+
+  const startSession = () => { setShotNum(1);setCapturing(false);go('shooting'); };
+
+  const onCountdownDone = () => setCapturing(true);
+  const onCaptured = () => {
+    if(shotNum<totalShots){ setShotNum(n=>n+1); setCapturing(false); }
+    else { go('photo-select'); }
+  };
+
+  return (
+    <div id="stage">
+      {screen==='splash' && <SplashScreen onNext={()=>go('frame-select')}/>}
+      {screen==='frame-select' && <FrameSelectScreen selFrame={selFrame} setSelFrame={setSelFrame} onNext={()=>{if(selFrame)go('photo-count');}} onPrev={()=>go('splash')}/>}
+      {screen==='photo-count' && <PhotoCountScreen count={count} setCount={setCount} framePrice={selFrame?.price||70000} onNext={()=>{setInserted(0);go('payment');}} onPrev={()=>go('frame-select')}/>}
+      {screen==='payment' && <PaymentScreen total={total} inserted={inserted} setInserted={setInserted} onNext={()=>go('ready-go')} onPrev={()=>go('photo-count')}/>}
+      {screen==='ready-go' && <ReadyGoScreen frame={selFrame} count={count} onNext={startSession}/>}
+      {screen==='shooting' && !capturing && <CountdownScreen shotNum={shotNum} totalShots={totalShots} onDone={onCountdownDone}/>}
+      {screen==='shooting' && capturing && <CaptureScreen shotNum={shotNum} totalShots={totalShots} onCapture={onCaptured}/>}
+      {screen==='photo-select' && <PhotoSelectScreen totalShots={totalShots} neededSlots={neededSlots} onNext={p=>{setSelPhotos(p);go('filter-select');}}/>}
+      {screen==='filter-select' && <FilterSelectScreen selPhotos={selPhotos} onNext={()=>go('printing')}/>}
+      {screen==='printing' && <PrintingScreen selPhotos={selPhotos} onDone={reset}/>}
+    </div>
+  );
+};
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
