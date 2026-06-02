@@ -260,6 +260,9 @@ class _PrintingScreenState extends BasePageState<PrintingScreenListenState,
     return Selector<PrintingScreenProvider, Uint8List>(
       selector: (_, provider) => provider.qrCode,
       builder: (context, qr, child) {
+        final isUploadQueued = context.select<PrintingScreenProvider, bool>(
+          (provider) => provider.isUploadQueued,
+        );
         final isReady = qr.isNotEmpty;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -272,7 +275,9 @@ class _PrintingScreenState extends BasePageState<PrintingScreenListenState,
               decoration: BoxDecoration(
                 color: isReady
                     ? const Color(0xFF208A4A)
-                    : FlashyBoothColors.pink.withValues(alpha: 0.24),
+                    : isUploadQueued
+                        ? const Color(0xFFB88416)
+                        : FlashyBoothColors.pink.withValues(alpha: 0.24),
                 borderRadius: BorderRadius.circular(999.r),
               ),
             ),
@@ -284,11 +289,17 @@ class _PrintingScreenState extends BasePageState<PrintingScreenListenState,
                       vi: 'Quét QR để tải ảnh',
                       en: 'Scan QR to download',
                     )
-                  : flashyBoothText(
-                      context,
-                      vi: 'Đang chuẩn bị ảnh của bạn...',
-                      en: 'Preparing your photos...',
-                    ),
+                  : isUploadQueued
+                      ? flashyBoothText(
+                          context,
+                          vi: 'Dang cho upload khi co mang',
+                          en: 'Waiting to upload when online',
+                        )
+                      : flashyBoothText(
+                          context,
+                          vi: 'Đang chuẩn bị ảnh của bạn...',
+                          en: 'Preparing your photos...',
+                        ),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
@@ -340,9 +351,11 @@ class _PrintingScreenState extends BasePageState<PrintingScreenListenState,
   }
 
   Widget _buildQrBox() {
-    return Selector<PrintingScreenProvider, Uint8List>(
-      selector: (_, provider) => provider.qrCode,
-      builder: (context, qr, child) {
+    return Selector<PrintingScreenProvider, (Uint8List, bool)>(
+      selector: (_, provider) => (provider.qrCode, provider.isUploadQueued),
+      builder: (context, state, child) {
+        final qr = state.$1;
+        final isUploadQueued = state.$2;
         return Container(
           width: 246.w,
           height: 246.w,
@@ -360,14 +373,20 @@ class _PrintingScreenState extends BasePageState<PrintingScreenListenState,
           ),
           child: qr.isEmpty
               ? Center(
-                  child: SizedBox(
-                    width: 58.r,
-                    height: 58.r,
-                    child: const CircularProgressIndicator(
-                      strokeWidth: 6,
-                      color: Colors.white,
-                    ),
-                  ),
+                  child: isUploadQueued
+                      ? Icon(
+                          Icons.cloud_off_rounded,
+                          color: Colors.white,
+                          size: 62.r,
+                        )
+                      : SizedBox(
+                          width: 58.r,
+                          height: 58.r,
+                          child: const CircularProgressIndicator(
+                            strokeWidth: 6,
+                            color: Colors.white,
+                          ),
+                        ),
                 )
               : DecoratedBox(
                   decoration: BoxDecoration(

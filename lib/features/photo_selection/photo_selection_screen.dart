@@ -605,7 +605,7 @@ class _RetakePill extends StatelessWidget {
         children: [
           Assets.icons.redoIc.svg(
             width: 12.w,
-            colorFilter: const ColorFilter.mode(
+            colorFilter: ColorFilter.mode(
               FlashyBoothColors.pink,
               BlendMode.srcIn,
             ),
@@ -764,7 +764,7 @@ class _OrderBadge extends StatelessWidget {
       width: 30.w,
       height: 30.w,
       alignment: Alignment.center,
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: FlashyBoothColors.pink,
         shape: BoxShape.circle,
       ),

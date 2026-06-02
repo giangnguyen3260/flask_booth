@@ -49,6 +49,15 @@ class PaymentScreenProvider extends BaseProvider<PaymentScreenListenState> {
     checkMoneyValue();
   }
 
+  void completeMockPayment() {
+    if (!appState.isMockPaymentMode) {
+      return;
+    }
+    currentAmount = totalPayable;
+    notifyListeners();
+    checkMoneyValue();
+  }
+
   void _billAcceptorListen(BillAcceptorResponseEnum data) {
     var type = data.getType();
     if (type == BillAcceptorTypeEnum.cashValue) {

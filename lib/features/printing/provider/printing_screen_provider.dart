@@ -2,7 +2,6 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui';
 
-import 'package:dio/dio.dart';
 import 'package:injectable/injectable.dart';
 import 'package:project_l/common/enums/printer_cut_mode.dart';
 import 'package:project_l/common/extensions/size_extension.dart';
@@ -12,7 +11,6 @@ import 'package:project_l/common/util/ffmpeg_utils.dart' show FfmpegUtils;
 import 'package:project_l/common/util/printer_utils.dart';
 import 'package:project_l/common/util/qr_utils.dart';
 import 'package:project_l/features/printing/provider/printing_screen_listen_state.dart';
-import 'package:project_l/remote/models/qr_detail.dart';
 
 @injectable
 class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
@@ -23,6 +21,7 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
   Uint8List qrCode = Uint8List.fromList([]);
   String finalPrintImagePath = '';
   String qrUrl = '';
+  bool isUploadQueued = false;
 
   PrintingScreenProvider(this._ffmpegUtils, this._printerUtils, this._qrUtils);
 
@@ -39,6 +38,7 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
     qrCode = Uint8List.fromList([]);
     qrUrl = '';
     finalPrintImagePath = '';
+    isUploadQueued = false;
     notifyListeners();
 
     var transparent =
@@ -113,7 +113,7 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
             : appState.imageParam.printQuantity,
         orientation: Size(size.$1, size.$2).orientation);
 
-    final videoFiles = <MultipartFile>[];
+    final videoPaths = <String>[];
     if (appState.imageParam.videos.isNotEmpty) {
       var mergedVideo = await _ffmpegUtils.mergeVideo(
           backgroundPath: backgroundPath,
@@ -122,22 +122,23 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
           transparents: transparent,
           params: appState.imageParam.pansAndScales,
           flip: appState.imageParam.isFlipped);
-      videoFiles.add(await MultipartFile.fromFile(mergedVideo));
+      videoPaths.add(mergedVideo);
     }
 
-    QRDetail response = await appState.restClient.submit(
+    final response = await appState.submitOrQueueResult(
         saleNo: appState.imageParam.session,
         cuKey: appState.imageParam.couponCode,
         frameId: appState.imageParam.selectedFrame.frameCd ?? '',
-        img: [await MultipartFile.fromFile(uploadImage)],
-        video: videoFiles,
+        imagePath: uploadImage,
+        videoPaths: videoPaths,
         amount: appState.imageParam.selectedFrame.price ?? 0,
         printQuantity: appState.imageParam.printQuantity);
 
-    qrUrl = response.qrUrl ?? '';
-    if (response.qrUrl?.isNotEmpty ?? false) {
+    qrUrl = response?.qrUrl ?? '';
+    isUploadQueued = response == null;
+    if (response?.qrUrl?.isNotEmpty ?? false) {
       qrCode = await _qrUtils.generateQr(
-        encodedString: response.qrUrl ?? '',
+        encodedString: response?.qrUrl ?? '',
         size: 250,
       );
     }

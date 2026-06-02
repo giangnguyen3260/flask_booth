@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:auto_route/auto_route.dart';
@@ -26,6 +27,27 @@ class _StandByScreenState
     extends BasePageState<StandByListenState, StandByProvider, StandByScreen> {
   final ffmpegUtil = GetIt.instance.get<FfmpegUtils>();
   bool _isReloading = false;
+  Timer? _adminUpdateCheckTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(appState.checkForAdminDataUpdate(force: true));
+    unawaited(appState.retryPendingUploads());
+    _adminUpdateCheckTimer = Timer.periodic(
+      AppState.adminUpdateCheckInterval,
+      (_) {
+        unawaited(appState.checkForAdminDataUpdate());
+        unawaited(appState.retryPendingUploads());
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _adminUpdateCheckTimer?.cancel();
+    super.dispose();
+  }
 
   @override
   bool isShowCountDown() => false;
@@ -119,33 +141,63 @@ class _StandByScreenState
                 Positioned(
                   left: 120.w,
                   bottom: 72.h,
-                  child: SizedBox(
-                    width: 52.w,
-                    height: 52.w,
-                    child: Material(
-                      color: Colors.white.withValues(alpha: 0.65),
-                      shape: const CircleBorder(),
-                      child: InkWell(
-                        customBorder: const CircleBorder(),
-                        onTap: _isReloading ? null : _reloadRemoteData,
-                        child: Center(
-                          child: _isReloading
-                              ? SizedBox(
-                                  width: 22.w,
-                                  height: 22.w,
-                                  child: const CircularProgressIndicator(
-                                    strokeWidth: 2.4,
-                                    color: FlashyBoothColors.pink,
+                  child: Selector<AppState, bool>(
+                    selector: (_, provider) => provider.hasPendingAdminUpdate,
+                    builder: (context, hasPendingUpdate, child) {
+                      return SizedBox(
+                        width: 58.w,
+                        height: 58.w,
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            Positioned.fill(
+                              child: Material(
+                                color: Colors.white.withValues(alpha: 0.65),
+                                shape: const CircleBorder(),
+                                child: InkWell(
+                                  customBorder: const CircleBorder(),
+                                  onTap:
+                                      _isReloading ? null : _reloadRemoteData,
+                                  child: Center(
+                                    child: _isReloading
+                                        ? SizedBox(
+                                            width: 22.w,
+                                            height: 22.w,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2.4,
+                                              color: FlashyBoothColors.pink,
+                                            ),
+                                          )
+                                        : Icon(
+                                            Icons.refresh_rounded,
+                                            color: FlashyBoothColors.pink,
+                                            size: 27.r,
+                                          ),
                                   ),
-                                )
-                              : Icon(
-                                  Icons.refresh_rounded,
-                                  color: FlashyBoothColors.pink,
-                                  size: 27.r,
                                 ),
+                              ),
+                            ),
+                            if (hasPendingUpdate)
+                              Positioned(
+                                top: 1.h,
+                                right: 1.w,
+                                child: Container(
+                                  width: 14.r,
+                                  height: 14.r,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF208A4A),
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: Colors.white,
+                                      width: 2.w,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
-                      ),
-                    ),
+                      );
+                    },
                   ),
                 ),
               ],
@@ -257,7 +309,7 @@ class _SplashBackground extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: FlashyBoothColors.cream,
       ),
       child: Stack(

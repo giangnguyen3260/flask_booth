@@ -3,10 +3,13 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:colorfilter_generator/colorfilter_generator.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:injectable/injectable.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import 'package:project_l/common/log/log_mixin.dart';
 import 'package:project_l/common/models/effect.dart';
@@ -21,11 +24,19 @@ import 'package:project_l/common/util/remote_image_utils.dart';
 import 'package:project_l/config/injetable_config.dart';
 import 'package:project_l/common/models/app_theme_config.dart';
 import 'package:project_l/remote/models/app_data.dart';
+import 'package:project_l/remote/models/qr_detail.dart';
 import 'package:project_l/remote/service/app_service.dart';
 import 'package:uuid/uuid.dart';
 
 @singleton
 class AppState extends ChangeNotifier with LogMixin {
+  static const String _fallbackAppDataAsset =
+      'assets/dummy/local_main_info.json';
+  static const int _maxAdminDataBackups = 10;
+  static const String _adminDataBackupFolder = 'admin_data_backups';
+  static const String _uploadQueueFolder = 'upload_queue';
+  static const Duration adminUpdateCheckInterval = Duration(minutes: 5);
+
   Locale locate = const Locale("vi");
   final RemoteImageUtils remoteImageUtils;
   final BackgroundMaskUtils backgroundMaskUtils = BackgroundMaskUtils();
@@ -44,6 +55,11 @@ class AppState extends ChangeNotifier with LogMixin {
   final CameraPowerUtil cameraPowerUtil = getIt.get();
   final CameraUtils cameraUtils = getIt.get();
   async.Timer? _heartbeatTimer;
+  String activeAdminDataVersion = '';
+  String latestAdminDataVersion = '';
+  bool hasPendingAdminUpdate = false;
+  bool isCheckingAdminUpdate = false;
+  DateTime? lastAdminUpdateCheckAt;
 
   AppState({
     required this.restClient,
@@ -169,43 +185,63 @@ class AppState extends ChangeNotifier with LogMixin {
   }
 
   Future<void> _loadRemoteData() async {
-    final remoteData = await restClient.initData();
-    appData = remoteData;
-    final List<FramesInfo> tempData = [];
-    for (FramesInfo frameInfo in frameInfos) {
-      var tempFrameFileName = _lastPathSegment(frameInfo.frameUrlTempDis ?? "");
-      var mainFrameFileName = _lastPathSegment(frameInfo.frameUrl ?? "");
-      if (tempFrameFileName.isEmpty || mainFrameFileName.isEmpty) continue;
+    AppData remoteData;
+    if (_shouldUseFallbackAppData) {
+      logD('Loading fallback app data from $_fallbackAppDataAsset');
+      remoteData = await _loadFallbackAppData();
+      await _applyPreparedAppData(await _prepareAppData(remoteData));
+      return;
+    }
+    try {
+      remoteData = await restClient.initData();
+      final preparedData = await _prepareAppData(remoteData);
+      await _saveAdminDataBackup(preparedData);
+      await _applyPreparedAppData(preparedData);
+    } catch (error, stackTrace) {
+      logE(error, stackTrace: stackTrace);
+      final backupData = await _loadLatestAdminDataBackup();
+      if (backupData != null) {
+        logD('Loading latest admin data backup');
+        await _applyPreparedAppData(backupData);
+        return;
+      }
+      logD('Loading fallback app data from $_fallbackAppDataAsset');
+      remoteData = await _loadFallbackAppData();
+      await _applyPreparedAppData(await _prepareAppData(remoteData));
+    }
+  }
 
-      var tempFramePath = await remoteImageUtils.downloadAndSaveFile(
-          frameInfo.frameUrlTempDis!, tempFrameFileName);
-      var mainFramePath = await remoteImageUtils.downloadAndSaveFile(
-          frameInfo.frameUrl!, mainFrameFileName);
+  Future<AppData> _loadFallbackAppData() async {
+    final jsonText = await rootBundle.loadString(_fallbackAppDataAsset);
+    final jsonMap = jsonDecode(jsonText) as Map<String, Object?>;
+    return AppData.fromJson(jsonMap);
+  }
+
+  Future<AppData> _prepareAppData(AppData remoteData) async {
+    final List<FramesInfo> tempData = [];
+    for (FramesInfo frameInfo in remoteData.framesInfo ?? []) {
+      var tempFramePath = await _resolveImagePath(frameInfo.frameUrlTempDis);
+      var mainFramePath = await _resolveImagePath(frameInfo.frameUrl);
+      if (tempFramePath.isEmpty && mainFramePath.isEmpty) continue;
 
       frameInfo = frameInfo.copyWith(
-          frameUrlTempDis: tempFramePath, frameUrl: mainFramePath);
+        frameUrlTempDis: tempFramePath.isNotEmpty ? tempFramePath : null,
+        frameUrl: mainFramePath.isNotEmpty ? mainFramePath : tempFramePath,
+      );
       List<BackgroundInfo> tempBackgroundInfo = [];
       for (BackgroundInfo backgroundCategory
           in (frameInfo.backgroundInfo ?? [])) {
-        var backgroundCateFileName =
-            _lastPathSegment(backgroundCategory.bgCateIcon ?? "");
-        if (backgroundCateFileName.isNotEmpty &&
-            (backgroundCategory.bgCateIcon ?? "").isNotEmpty) {
-          var backgroundCateFilePath =
-              await remoteImageUtils.downloadAndSaveFile(
-            backgroundCategory.bgCateIcon!,
-            backgroundCateFileName,
-          );
+        var backgroundCateFilePath =
+            await _resolveImagePath(backgroundCategory.bgCateIcon);
+        if (backgroundCateFilePath.isNotEmpty) {
           backgroundCategory = backgroundCategory.copyWith(
             bgCateIcon: backgroundCateFilePath,
           );
         }
         List<Background> tempBackground = [];
         for (Background background in (backgroundCategory.background ?? [])) {
-          var backgroundFileName = _lastPathSegment(background.bgUrl ?? "");
-          if (backgroundFileName.isEmpty) continue;
-          var backgroundFilePath = await remoteImageUtils.downloadAndSaveFile(
-              background.bgUrl!, backgroundFileName);
+          var backgroundFilePath = await _resolveImagePath(background.bgUrl);
+          if (backgroundFilePath.isEmpty) continue;
           if ((background.maskJson ?? []).isNotEmpty) {
             backgroundFilePath =
                 await backgroundMaskUtils.resolveMaskedBackgroundPath(
@@ -220,23 +256,198 @@ class AppState extends ChangeNotifier with LogMixin {
       }
       tempData.add(frameInfo.copyWith(backgroundInfo: tempBackgroundInfo));
     }
-    appData = appData.copyWith(framesInfo: tempData);
+    if (tempData.isEmpty && (remoteData.framesInfo ?? []).isNotEmpty) {
+      throw StateError('No usable frame assets were resolved from admin data');
+    }
+    return remoteData.copyWith(framesInfo: tempData);
+  }
+
+  Future<void> _applyPreparedAppData(AppData preparedData) async {
+    appData = preparedData;
+    activeAdminDataVersion = _adminDataVersion(preparedData);
+    latestAdminDataVersion = latestAdminDataVersion.isEmpty
+        ? activeAdminDataVersion
+        : latestAdminDataVersion;
+    hasPendingAdminUpdate =
+        _isDifferentVersion(latestAdminDataVersion, activeAdminDataVersion);
+  }
+
+  bool get _shouldUseFallbackAppData {
+    final override =
+        (Platform.environment['PTB_USE_LOCAL_MAIN_INFO'] ?? '').toLowerCase();
+    if (override == 'false' || override == '0') {
+      return false;
+    }
+    if (override == 'true' || override == '1') {
+      return true;
+    }
+    return !_hasLocalRuntimeConfig;
+  }
+
+  Future<String> _resolveImagePath(String? source) async {
+    final value = source?.trim() ?? "";
+    if (value.isEmpty) {
+      return "";
+    }
+    if (value.startsWith('assets/')) {
+      return _copyAssetToDocument(value);
+    }
+    if (value.startsWith('file://')) {
+      return Uri.parse(value).toFilePath(windows: Platform.isWindows);
+    }
+    if (File(value).existsSync()) {
+      return value;
+    }
+    final fileName = _lastPathSegment(value);
+    if (fileName.isEmpty) {
+      return "";
+    }
+    return remoteImageUtils.downloadAndSaveFile(value, fileName);
+  }
+
+  Future<String> _copyAssetToDocument(String assetPath) async {
+    final bytes = await rootBundle.load(assetPath);
+    final directory = await getApplicationDocumentsDirectory();
+    final targetDirectory = Directory(
+      path.join(directory.path, 'project_l', 'fallback_assets'),
+    );
+    if (!targetDirectory.existsSync()) {
+      targetDirectory.createSync(recursive: true);
+    }
+    final file =
+        File(path.join(targetDirectory.path, _lastPathSegment(assetPath)));
+    await file.writeAsBytes(
+      bytes.buffer.asUint8List(bytes.offsetInBytes, bytes.lengthInBytes),
+      flush: true,
+    );
+    return file.path;
   }
 
   Future<void> reloadRemoteData() async {
     final previousData = appData;
+    final previousActiveVersion = activeAdminDataVersion;
+    final previousLatestVersion = latestAdminDataVersion;
+    final previousPendingUpdate = hasPendingAdminUpdate;
     final previousSelectedFrameCode = imageParam.selectedFrame.frameCd;
     final previousSelectedBackgroundCode = imageParam.selectedBackground.bgCd;
     try {
-      await _loadRemoteData();
+      final remoteData = await restClient.initData();
+      final preparedData = await _prepareAppData(remoteData);
+      await _saveAdminDataBackup(preparedData);
+      await _applyPreparedAppData(preparedData);
+      latestAdminDataVersion = activeAdminDataVersion;
+      hasPendingAdminUpdate = false;
       _syncSelectedFrameFromRemote(previousSelectedFrameCode);
       _syncSelectedBackgroundFromRemote(previousSelectedBackgroundCode);
       notifyListeners();
     } catch (error, stackTrace) {
       logE(error, stackTrace: stackTrace);
       appData = previousData;
+      activeAdminDataVersion = previousActiveVersion;
+      latestAdminDataVersion = previousLatestVersion;
+      hasPendingAdminUpdate = previousPendingUpdate;
       notifyListeners();
       rethrow;
+    }
+  }
+
+  Future<void> checkForAdminDataUpdate({bool force = false}) async {
+    if (_shouldUseFallbackAppData || isCheckingAdminUpdate) {
+      return;
+    }
+    final now = DateTime.now();
+    if (!force &&
+        lastAdminUpdateCheckAt != null &&
+        now.difference(lastAdminUpdateCheckAt!) < adminUpdateCheckInterval) {
+      return;
+    }
+    isCheckingAdminUpdate = true;
+    notifyListeners();
+    try {
+      final response =
+          await networkProvider.appDio.get('/pub/main-info/version');
+      final data = response.data;
+      final version = _readVersionValue(data);
+      if (version.isNotEmpty) {
+        latestAdminDataVersion = version;
+        hasPendingAdminUpdate =
+            _isDifferentVersion(latestAdminDataVersion, activeAdminDataVersion);
+      }
+      lastAdminUpdateCheckAt = now;
+    } catch (error, stackTrace) {
+      logE(error, stackTrace: stackTrace);
+    } finally {
+      isCheckingAdminUpdate = false;
+      notifyListeners();
+    }
+  }
+
+  Future<QRDetail?> submitOrQueueResult({
+    required String saleNo,
+    required String frameId,
+    required String imagePath,
+    required List<String> videoPaths,
+    required double amount,
+    required int printQuantity,
+    String? cuKey,
+  }) async {
+    final durableImagePath = await _copyUploadFile(
+      saleNo: saleNo,
+      sourcePath: imagePath,
+    );
+    final durableVideoPaths = <String>[];
+    for (final videoPath in videoPaths) {
+      durableVideoPaths.add(
+        await _copyUploadFile(saleNo: saleNo, sourcePath: videoPath),
+      );
+    }
+    final job = <String, Object?>{
+      'saleNo': saleNo,
+      'frameId': frameId,
+      'imagePath': durableImagePath,
+      'videoPaths': durableVideoPaths,
+      'cuKey': cuKey,
+      'amount': amount,
+      'printQuantity': printQuantity,
+      'status': 'pending_upload',
+      'createdAt': DateTime.now().toUtc().toIso8601String(),
+      'updatedAt': DateTime.now().toUtc().toIso8601String(),
+    };
+
+    try {
+      return await _submitUploadJob(job);
+    } catch (error, stackTrace) {
+      logE(error, stackTrace: stackTrace);
+      await _upsertUploadJob(job);
+      return null;
+    }
+  }
+
+  Future<void> retryPendingUploads() async {
+    final jobs = await _readUploadJobs();
+    var changed = false;
+    for (final job in jobs) {
+      final status = (job['status'] ?? '').toString();
+      if (status != 'pending_upload' && status != 'failed_retryable') {
+        continue;
+      }
+      job['status'] = 'uploading';
+      job['updatedAt'] = DateTime.now().toUtc().toIso8601String();
+      changed = true;
+      await _writeUploadJobs(jobs);
+      try {
+        final response = await _submitUploadJob(job);
+        job['status'] = 'uploaded';
+        job['qrUrl'] = response.qrUrl;
+      } catch (error, stackTrace) {
+        logE(error, stackTrace: stackTrace);
+        job['status'] = 'failed_retryable';
+      }
+      job['updatedAt'] = DateTime.now().toUtc().toIso8601String();
+      await _writeUploadJobs(jobs);
+    }
+    if (changed) {
+      logD('Upload queue retry completed');
     }
   }
 
@@ -353,6 +564,7 @@ class AppState extends ChangeNotifier with LogMixin {
   bool get isMockPaymentMode =>
       (Platform.environment['PTB_PAYMENT_MODE'] ?? '').trim().toLowerCase() ==
           'mock' ||
+      _shouldUseFallbackAppData ||
       (!kReleaseMode &&
           (Platform.isMacOS || Platform.isWindows || Platform.isLinux) &&
           !_hasLocalRuntimeConfig);
@@ -491,6 +703,182 @@ class AppState extends ChangeNotifier with LogMixin {
       return "";
     }
     return value.split("/").last;
+  }
+
+  String _adminDataVersion(AppData data) {
+    final version = data.configInfo?.configVersion;
+    return version == null ? '' : version.toString();
+  }
+
+  String _readVersionValue(Object? data) {
+    if (data is Map) {
+      final version = data['version'] ?? data['configVersion'];
+      return version?.toString().trim() ?? '';
+    }
+    return '';
+  }
+
+  bool _isDifferentVersion(String latestVersion, String activeVersion) {
+    if (latestVersion.trim().isEmpty || activeVersion.trim().isEmpty) {
+      return false;
+    }
+    return latestVersion.trim() != activeVersion.trim();
+  }
+
+  Future<Directory> _appDocumentSubDirectory(String folder) async {
+    final directory = await getApplicationDocumentsDirectory();
+    final targetDirectory = Directory(
+      path.join(directory.path, 'project_l', folder),
+    );
+    if (!targetDirectory.existsSync()) {
+      await targetDirectory.create(recursive: true);
+    }
+    return targetDirectory;
+  }
+
+  String _sanitizePathSegment(String value) {
+    final sanitized = value.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
+    return sanitized.isEmpty ? 'unknown' : sanitized;
+  }
+
+  Future<void> _saveAdminDataBackup(AppData preparedData) async {
+    final backupDirectory =
+        await _appDocumentSubDirectory(_adminDataBackupFolder);
+    final version = _sanitizePathSegment(_adminDataVersion(preparedData));
+    final timestamp = DateTime.now().toUtc().millisecondsSinceEpoch;
+    final file = File(
+      path.join(backupDirectory.path, '${timestamp}_$version.json'),
+    );
+    await file.writeAsString(jsonEncode(preparedData.toJson()), flush: true);
+    await _pruneAdminDataBackups(backupDirectory);
+  }
+
+  Future<void> _pruneAdminDataBackups(Directory backupDirectory) async {
+    final files = backupDirectory
+        .listSync()
+        .whereType<File>()
+        .where((file) => file.path.toLowerCase().endsWith('.json'))
+        .toList()
+      ..sort((a, b) => b.lastModifiedSync().compareTo(a.lastModifiedSync()));
+    for (var index = _maxAdminDataBackups; index < files.length; index++) {
+      try {
+        await files[index].delete();
+      } catch (error, stackTrace) {
+        logE(error, stackTrace: stackTrace);
+      }
+    }
+  }
+
+  Future<AppData?> _loadLatestAdminDataBackup() async {
+    final backupDirectory =
+        await _appDocumentSubDirectory(_adminDataBackupFolder);
+    final files = backupDirectory
+        .listSync()
+        .whereType<File>()
+        .where((file) => file.path.toLowerCase().endsWith('.json'))
+        .toList()
+      ..sort((a, b) => b.lastModifiedSync().compareTo(a.lastModifiedSync()));
+    for (final file in files) {
+      try {
+        final jsonMap = jsonDecode(await file.readAsString());
+        if (jsonMap is Map<String, dynamic>) {
+          return AppData.fromJson(jsonMap);
+        }
+      } catch (error, stackTrace) {
+        logE(error, stackTrace: stackTrace);
+      }
+    }
+    return null;
+  }
+
+  Future<String> _copyUploadFile({
+    required String saleNo,
+    required String sourcePath,
+  }) async {
+    final source = File(sourcePath);
+    if (!source.existsSync()) {
+      throw StateError('Upload source file does not exist: $sourcePath');
+    }
+    final queueDirectory = await _appDocumentSubDirectory(_uploadQueueFolder);
+    final sessionDirectory = Directory(
+      path.join(queueDirectory.path, 'files', _sanitizePathSegment(saleNo)),
+    );
+    if (!sessionDirectory.existsSync()) {
+      await sessionDirectory.create(recursive: true);
+    }
+    final target =
+        File(path.join(sessionDirectory.path, path.basename(sourcePath)));
+    if (target.path == source.path) {
+      return target.path;
+    }
+    await source.copy(target.path);
+    return target.path;
+  }
+
+  Future<File> _uploadJobsFile() async {
+    final queueDirectory = await _appDocumentSubDirectory(_uploadQueueFolder);
+    return File(path.join(queueDirectory.path, 'jobs.json'));
+  }
+
+  Future<List<Map<String, Object?>>> _readUploadJobs() async {
+    final file = await _uploadJobsFile();
+    if (!file.existsSync()) {
+      return [];
+    }
+    try {
+      final decoded = jsonDecode(await file.readAsString());
+      if (decoded is List) {
+        return decoded
+            .whereType<Map>()
+            .map((item) => Map<String, Object?>.from(item))
+            .toList();
+      }
+    } catch (error, stackTrace) {
+      logE(error, stackTrace: stackTrace);
+    }
+    return [];
+  }
+
+  Future<void> _writeUploadJobs(List<Map<String, Object?>> jobs) async {
+    final file = await _uploadJobsFile();
+    await file.writeAsString(jsonEncode(jobs), flush: true);
+  }
+
+  Future<void> _upsertUploadJob(Map<String, Object?> job) async {
+    final jobs = await _readUploadJobs();
+    final saleNo = (job['saleNo'] ?? '').toString();
+    final existingIndex = jobs.indexWhere(
+      (item) => (item['saleNo'] ?? '').toString() == saleNo,
+    );
+    if (existingIndex >= 0) {
+      jobs[existingIndex] = job;
+    } else {
+      jobs.add(job);
+    }
+    await _writeUploadJobs(jobs);
+  }
+
+  Future<QRDetail> _submitUploadJob(Map<String, Object?> job) async {
+    final imagePath = (job['imagePath'] ?? '').toString();
+    final rawVideoPaths = job['videoPaths'];
+    final videoPaths = rawVideoPaths is List
+        ? rawVideoPaths.map((item) => item.toString()).toList()
+        : <String>[];
+    final videoFiles = <MultipartFile>[];
+    for (final videoPath in videoPaths) {
+      if (File(videoPath).existsSync()) {
+        videoFiles.add(await MultipartFile.fromFile(videoPath));
+      }
+    }
+    return restClient.submit(
+      saleNo: (job['saleNo'] ?? '').toString(),
+      cuKey: job['cuKey']?.toString(),
+      frameId: (job['frameId'] ?? '').toString(),
+      img: [await MultipartFile.fromFile(imagePath)],
+      video: videoFiles,
+      amount: (job['amount'] as num?)?.toDouble() ?? 0,
+      printQuantity: (job['printQuantity'] as num?)?.toInt() ?? 0,
+    );
   }
 
   FramesInfo _resolveCanonicalFrame(FramesInfo frameInfo) {

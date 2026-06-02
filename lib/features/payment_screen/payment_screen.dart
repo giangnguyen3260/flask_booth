@@ -728,7 +728,44 @@ class _MockCashPanel extends StatelessWidget {
               _DenominationButton(amount: 200000),
             ],
           ),
+          14.verticalSpace,
+          _CompleteMockPaymentButton(),
         ],
+      ),
+    );
+  }
+}
+
+class _CompleteMockPaymentButton extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final state = context.findAncestorStateOfType<_PaymentScreenScreenState>()!;
+    return Material(
+      color: FlashyBoothColors.pink,
+      borderRadius: BorderRadius.circular(999.r),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(999.r),
+        onTap: state.provider.completeMockPayment,
+        child: SizedBox(
+          width: 260.w,
+          height: 48.h,
+          child: Center(
+            child: Text(
+              flashyBoothText(
+                context,
+                vi: 'Thanh toan thu',
+                en: 'Mock payment',
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: style24400.copyWith(
+                color: Colors.white,
+                fontSize: 17.sp,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
