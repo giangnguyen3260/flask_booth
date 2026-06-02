@@ -176,6 +176,8 @@ class AppState extends ChangeNotifier with LogMixin {
     }
     if (remoteApiBaseUrl.isNotEmpty) {
       networkProvider.setBaseUrl(remoteApiBaseUrl);
+    } else {
+      remoteApiBaseUrl = networkProvider.appDio.options.baseUrl;
     }
   }
 
@@ -281,7 +283,7 @@ class AppState extends ChangeNotifier with LogMixin {
     if (override == 'true' || override == '1') {
       return true;
     }
-    return !_hasLocalRuntimeConfig;
+    return !kReleaseMode && !_hasLocalRuntimeConfig;
   }
 
   Future<String> _resolveImagePath(String? source) async {
@@ -298,11 +300,39 @@ class AppState extends ChangeNotifier with LogMixin {
     if (File(value).existsSync()) {
       return value;
     }
-    final fileName = _lastPathSegment(value);
+    final remoteUrl = _normalizeRemoteAssetUrl(value);
+    final fileName = _lastPathSegment(remoteUrl);
     if (fileName.isEmpty) {
       return "";
     }
-    return remoteImageUtils.downloadAndSaveFile(value, fileName);
+    return remoteImageUtils.downloadAndSaveFile(remoteUrl, fileName);
+  }
+
+  String _normalizeRemoteAssetUrl(String value) {
+    final assetUri = Uri.tryParse(value);
+    final baseUri = Uri.tryParse(remoteApiBaseUrl);
+    if (assetUri == null ||
+        baseUri == null ||
+        !assetUri.hasScheme ||
+        assetUri.host.isEmpty) {
+      return value;
+    }
+    final assetHost = assetUri.host.toLowerCase();
+    if (assetHost != 'localhost' && assetHost != '127.0.0.1') {
+      return value;
+    }
+    if (baseUri.host.isEmpty ||
+        baseUri.host == 'localhost' ||
+        baseUri.host == '127.0.0.1') {
+      return value;
+    }
+    return assetUri
+        .replace(
+          scheme: baseUri.scheme,
+          host: baseUri.host,
+          port: baseUri.hasPort ? baseUri.port : null,
+        )
+        .toString();
   }
 
   Future<String> _copyAssetToDocument(String assetPath) async {

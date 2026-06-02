@@ -65,7 +65,10 @@ class ShootingScreenProvider extends BaseProvider<ShootingScreenListenState> {
         second: second);
   }
 
-  Future<void> saveMockCapture({required String imagePath}) async {
+  Future<void> saveMockCapture({
+    required String imagePath,
+    String? videoPath,
+  }) async {
     final sourceFile = File(imagePath);
     if (!sourceFile.existsSync()) {
       final assetBytes =
@@ -84,10 +87,24 @@ class ShootingScreenProvider extends BaseProvider<ShootingScreenListenState> {
       'mock_capture_${appState.imageParam.session}_$captureIndex.jpg',
     );
     await sourceFile.copy(uniquePath);
+    var resolvedVideoPath = uniquePath;
+    if (videoPath != null && videoPath.isNotEmpty) {
+      final sourceVideoFile = File(videoPath);
+      if (sourceVideoFile.existsSync()) {
+        final extension = path.extension(videoPath).isEmpty
+            ? '.mp4'
+            : path.extension(videoPath);
+        resolvedVideoPath = path.join(
+          folder,
+          'mock_capture_${appState.imageParam.session}_$captureIndex$extension',
+        );
+        await sourceVideoFile.copy(resolvedVideoPath);
+      }
+    }
 
     uiImages.add(uniquePath);
     tImages.add(uniquePath);
-    tVideos.add(uniquePath);
+    tVideos.add(resolvedVideoPath);
     unawaited(
       appState.sendEvent(
         eventType: "PHOTO_CAPTURED",

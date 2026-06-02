@@ -12,6 +12,8 @@ import 'package:project_l/remote/models/coupon_detail.dart';
 
 @injectable
 class PaymentScreenProvider extends BaseProvider<PaymentScreenListenState> {
+  static const double _defaultMockPaymentAmount = 100000;
+
   final Queue<BillAcceptorResponseEnum> _cash = Queue();
 
   final BillAcceptorUtils _billAcceptorUtils;
@@ -26,7 +28,9 @@ class PaymentScreenProvider extends BaseProvider<PaymentScreenListenState> {
 
   void initBillAcceptor() {
     if (appState.isMockPaymentMode) {
+      currentAmount = _defaultMockPaymentAmount;
       notifyListeners();
+      checkMoneyValue();
       return;
     }
     _billAcceptorUtils.listen(onData: (data) {

@@ -263,11 +263,14 @@ class _PrintingScreenState extends BasePageState<PrintingScreenListenState,
         final isUploadQueued = context.select<PrintingScreenProvider, bool>(
           (provider) => provider.isUploadQueued,
         );
+        final status = context.select<PrintingScreenProvider, String>(
+          (provider) => provider.preparationStatus,
+        );
         final isReady = qr.isNotEmpty;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Center(child: _buildQrBox()),
+            Center(child: _buildDownloadPreviewBox()),
             24.verticalSpace,
             Container(
               width: double.infinity,
@@ -297,8 +300,12 @@ class _PrintingScreenState extends BasePageState<PrintingScreenListenState,
                         )
                       : flashyBoothText(
                           context,
-                          vi: 'Đang chuẩn bị ảnh của bạn...',
-                          en: 'Preparing your photos...',
+                          vi: status.isEmpty
+                              ? 'Đang chuẩn bị ảnh của bạn...'
+                              : status,
+                          en: status.isEmpty
+                              ? 'Preparing your photos...'
+                              : status,
                         ),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
@@ -395,6 +402,85 @@ class _PrintingScreenState extends BasePageState<PrintingScreenListenState,
                   ),
                   child: Image.memory(qr, fit: BoxFit.cover),
                 ),
+        );
+      },
+    );
+  }
+
+  Widget _buildDownloadPreviewBox() {
+    return Selector<PrintingScreenProvider, (Uint8List, bool, String)>(
+      selector: (_, provider) => (
+        provider.qrCode,
+        provider.isUploadQueued,
+        provider.finalPrintImagePath,
+      ),
+      builder: (context, state, child) {
+        final qr = state.$1;
+        final isUploadQueued = state.$2;
+        final finalImagePath = state.$3;
+        final hasFinalImage =
+            finalImagePath.isNotEmpty && File(finalImagePath).existsSync();
+        if (qr.isNotEmpty) {
+          return _buildQrBox();
+        }
+        return Container(
+          width: 246.w,
+          height: 246.w,
+          padding: EdgeInsets.all(10.r),
+          decoration: BoxDecoration(
+            color: FlashyBoothColors.pink,
+            borderRadius: BorderRadius.circular(12.r),
+            boxShadow: [
+              BoxShadow(
+                color: FlashyBoothColors.pink.withValues(alpha: 0.28),
+                blurRadius: 28.r,
+                offset: Offset(0, 14.h),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(6.r),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                ColoredBox(
+                  color: Colors.white,
+                  child: hasFinalImage
+                      ? Image.file(
+                          File(finalImagePath),
+                          fit: BoxFit.contain,
+                          filterQuality: FilterQuality.high,
+                        )
+                      : _buildLivePreview(),
+                ),
+                Positioned(
+                  right: 10.r,
+                  bottom: 10.r,
+                  child: Container(
+                    width: 38.r,
+                    height: 38.r,
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.54),
+                      shape: BoxShape.circle,
+                    ),
+                    child: isUploadQueued
+                        ? Icon(
+                            Icons.cloud_off_rounded,
+                            color: Colors.white,
+                            size: 22.r,
+                          )
+                        : Padding(
+                            padding: EdgeInsets.all(9.r),
+                            child: const CircularProgressIndicator(
+                              strokeWidth: 3,
+                              color: Colors.white,
+                            ),
+                          ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         );
       },
     );

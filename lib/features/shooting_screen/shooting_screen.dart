@@ -57,6 +57,7 @@ class _ShootingScreenState extends BasePageState<ShootingScreenListenState,
 
   bool _isReadyGoVisible = false;
   bool _hasStartedShooting = false;
+  bool _hasCanonSession = false;
 
   @override
   bool isFooterEnabled() {
@@ -89,6 +90,7 @@ class _ShootingScreenState extends BasePageState<ShootingScreenListenState,
           await appState.cameraUtils.initCamera(0);
           await appState.cameraUtils.openSession();
           await appState.cameraUtils.saveToHost();
+          _hasCanonSession = true;
         }
       });
 
@@ -306,16 +308,74 @@ class _ShootingScreenState extends BasePageState<ShootingScreenListenState,
           }
         }
       } else {
-        var videoFile = await controller?.stopVideoRecording();
-        if (videoFile == null) return;
-        provider.saveVideo(videoPath: videoFile.path, second: shootingTime - 1);
+        final videoFile = await _stopVideoRecordingIfNeeded();
         _shutter.value = true;
+        if (appState.isMockPaymentMode && !_hasCanonSession) {
+          final imageFile = await _takeLaptopCameraPicture();
+          if (imageFile == null) return;
+          await provider.saveMockCapture(
+            imagePath: imageFile.path,
+            videoPath: videoFile?.path,
+          );
+          if (provider.uiImages.length < shotCount) {
+            _commonCounterController.reset();
+          } else {
+            if (mounted) {
+              _commonCounterController.stop();
+              provider.onNextEvent();
+            }
+          }
+          return;
+        }
+        if (videoFile != null) {
+          provider.saveVideo(
+            videoPath: videoFile.path,
+            second: shootingTime - 1,
+          );
+        }
         appState.cameraUtils.shoot();
       }
     } else {
       if (!isMockCameraMode && !(controller?.value.isRecordingVideo ?? false)) {
-        await controller?.startVideoRecording();
+        await _startVideoRecordingIfNeeded();
       }
+    }
+  }
+
+  Future<XFile?> _stopVideoRecordingIfNeeded() async {
+    if (!(controller?.value.isRecordingVideo ?? false)) {
+      return null;
+    }
+    try {
+      return controller?.stopVideoRecording();
+    } catch (error, stackTrace) {
+      logE(error, stackTrace: stackTrace);
+      return null;
+    }
+  }
+
+  Future<void> _startVideoRecordingIfNeeded() async {
+    if (controller == null ||
+        !controller!.value.isInitialized ||
+        controller!.value.isRecordingVideo) {
+      return;
+    }
+    try {
+      await controller!.startVideoRecording();
+    } catch (error, stackTrace) {
+      logE(error, stackTrace: stackTrace);
+    }
+  }
+
+  Future<XFile?> _takeLaptopCameraPicture() async {
+    if (controller == null || !controller!.value.isInitialized) {
+      return null;
+    }
+    try {
+      return controller!.takePicture();
+    } catch (error, stackTrace) {
+      logE(error, stackTrace: stackTrace);
+      return null;
     }
   }
 

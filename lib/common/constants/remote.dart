@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
-const defaultBaseUrl = 'http://116.109.110.35:8080/api/v1';
+const defaultBaseUrl = 'http://192.168.1.137:8080';
 
 String resolveBaseUrl() {
   final value = Platform.environment['PTB_BASE_URL'];

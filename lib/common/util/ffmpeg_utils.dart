@@ -51,33 +51,72 @@ class FfmpegUtils {
     if (imagePathSplit.isEmpty) return "";
     var imageOutput = path.join(_savedImagePath,
         "Processed_${imagePathSplit.last.replaceAll(".JPG", ".png")}");
-    ProcessResult process = await Process.run(Assets.files.main, [
+    final brightness =
+        effect?.brightness ?? FilterEnum.brightness.getDefaultValue();
+    final contrast = effect?.contrast ?? FilterEnum.contrast.getDefaultValue();
+    final saturation =
+        effect?.saturation ?? FilterEnum.saturation.getDefaultValue();
+    final vibrance = effect?.vibrance ?? FilterEnum.vibrance.getDefaultValue();
+    final temperature =
+        effect?.temperature ?? FilterEnum.temperature.getDefaultValue();
+    final sepia = effect?.sepia ?? FilterEnum.sepia.getDefaultValue();
+    final grain = effect?.grain ?? FilterEnum.grain.getDefaultValue();
+    if (!isFlip &&
+        brightness == FilterEnum.brightness.getDefaultValue() &&
+        contrast == FilterEnum.contrast.getDefaultValue() &&
+        saturation == FilterEnum.saturation.getDefaultValue() &&
+        vibrance == FilterEnum.vibrance.getDefaultValue() &&
+        temperature == FilterEnum.temperature.getDefaultValue() &&
+        sepia == FilterEnum.sepia.getDefaultValue() &&
+        grain == FilterEnum.grain.getDefaultValue()) {
+      await File(imagePath).copy(imageOutput);
+      return imageOutput;
+    }
+    ProcessResult process =
+        await Process.run(_resolveAssetFile(Assets.files.main), [
       "--input",
       imagePath,
       "--output",
       imageOutput,
       "--brightness",
-      "${effect?.brightness ?? FilterEnum.brightness.getDefaultValue()}",
+      "$brightness",
       "--contrast",
-      "${effect?.contrast ?? FilterEnum.contrast.getDefaultValue()}",
+      "$contrast",
       "--saturation",
-      "${effect?.saturation ?? FilterEnum.saturation.getDefaultValue()}",
+      "$saturation",
       "--vibrance",
-      "${effect?.vibrance ?? FilterEnum.vibrance.getDefaultValue()}",
+      "$vibrance",
       "--temperature",
-      "${effect?.temperature ?? FilterEnum.temperature.getDefaultValue()}",
+      "$temperature",
       "--sepia",
-      "${effect?.sepia ?? FilterEnum.sepia.getDefaultValue()}",
+      "$sepia",
       "--grain",
-      "${effect?.grain ?? FilterEnum.grain.getDefaultValue()}",
+      "$grain",
       "--flipX",
       (isFlip ? "True" : "False")
-    ]);
+    ]).timeout(const Duration(seconds: 20));
 
     if (kDebugMode) {
       print(process.stdout);
     }
     return imageOutput;
+  }
+
+  String _resolveAssetFile(String assetPath) {
+    if (File(assetPath).existsSync()) {
+      return assetPath;
+    }
+    final executableDir = path.dirname(Platform.resolvedExecutable);
+    final bundledPath = path.joinAll([
+      executableDir,
+      'data',
+      'flutter_assets',
+      ...assetPath.split('/'),
+    ]);
+    if (File(bundledPath).existsSync()) {
+      return bundledPath;
+    }
+    return assetPath;
   }
 
   String convertMatrixToGeq(List<double> matrix) {
