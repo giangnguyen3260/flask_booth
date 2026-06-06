@@ -16,6 +16,11 @@ import 'package:project_l/gen/assets.gen.dart';
 
 @Singleton()
 class FfmpegUtils {
+  static const Duration _imageMergeTimeout = Duration(seconds: 90);
+  static const Duration _videoMergeTimeout = Duration(minutes: 3);
+  static const int _imageMergeThreads = 1;
+  static const int _videoMergeThreads = 2;
+
   late final String baseImagePath;
   late final String baseVideoPath;
 
@@ -160,7 +165,7 @@ class FfmpegUtils {
     var imageOutput = path.join(_savedImagePath,
         "Output_${DateTimeUtils.format(date: DateTime.now(), format: "dd_MM_yyyy_HH_mm")}.png");
 
-    await FFMpegHelper.instance.runSync(
+    final outputFile = await FFMpegHelper.instance.runSync(
       FFMpegCommand(outputFilepath: imageOutput, inputs: [
         FFMpegInput([
           ...generateOverlayCommand(
@@ -170,6 +175,7 @@ class FfmpegUtils {
             transparents: transparents,
             params: params,
             flip: !flip,
+            threadCount: _imageMergeThreads,
           ),
           '-q:v',
           '2',
@@ -177,7 +183,11 @@ class FfmpegUtils {
           "png"
         ]),
       ]),
+      timeout: _imageMergeTimeout,
     );
+    if (outputFile == null || !outputFile.existsSync()) {
+      throw StateError('FFmpeg image merge failed: $imageOutput');
+    }
     return imageOutput;
   }
 
@@ -214,7 +224,7 @@ class FfmpegUtils {
     var videoOutput = path.join(_savedVideoPath,
         "Output_${DateTimeUtils.format(date: DateTime.now(), format: "dd_MM_yyyy_HH_mm")}.mp4");
 
-    await FFMpegHelper.instance.runSync(
+    final outputFile = await FFMpegHelper.instance.runSync(
       FFMpegCommand(outputFilepath: videoOutput, inputs: [
         FFMpegInput([
           ...generateOverlayCommand(
@@ -224,6 +234,7 @@ class FfmpegUtils {
             transparents: transparents,
             params: params,
             flip: flip,
+            threadCount: _videoMergeThreads,
           ),
           '-c:v',
           'libx264',
@@ -237,7 +248,11 @@ class FfmpegUtils {
           '+faststart',
         ]),
       ]),
+      timeout: _videoMergeTimeout,
     );
+    if (outputFile == null || !outputFile.existsSync()) {
+      throw StateError('FFmpeg video merge failed: $videoOutput');
+    }
 
     return videoOutput;
   }
@@ -266,6 +281,7 @@ class FfmpegUtils {
     required List<List<double>> transparents,
     required List<MatrixParam> params,
     required bool flip, // Thêm biến bool flip vào đây
+    int threadCount = 2,
   }) {
     if (images.length != transparents.length) {
       throw Exception('Số lượng images và transparents phải bằng nhau');
@@ -323,12 +339,14 @@ class FfmpegUtils {
         '$finalInputIndex pad=width=ceil(iw/2)*2:height=ceil(ih/2)*2 [frame_padded];';
     filterComplex += '$lastOutput[frame_padded] overlay=0:0';
 
+    command.add("-filter_threads");
+    command.add("$threadCount");
+    command.add("-filter_complex_threads");
+    command.add("$threadCount");
     command.add('-filter_complex');
     command.add(filterComplex.trim());
-    command.add("-cpu-used");
-    command.add("8");
     command.add("-threads");
-    command.add("8");
+    command.add("$threadCount");
     command.add('-y');
 
     return command;

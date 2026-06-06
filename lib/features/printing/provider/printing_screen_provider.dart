@@ -114,18 +114,9 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
         return;
       }
 
-      List<Future<String>> preprocessedImages = [];
-
-      for (var e in appState.imageParam.images) {
-        preprocessedImages.add(
-          _ffmpegUtils.preprocessImage(
-            imagePath: e,
-            effect: appState.imageParam.effect,
-            filter: appState.imageParam.colorFilter,
-            isFlip: appState.imageParam.isFlipped,
-          ),
-        );
-      }
+      preparationStatus = 'Preparing selected photos...';
+      notifyListeners();
+      final preprocessedImages = await _preprocessPrintImages();
 
       if (isCut) {
         preparationStatus = 'Preparing printer cut mode...';
@@ -139,7 +130,7 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
         uploadImage = await _ffmpegUtils.mergeImage(
             backgroundPath: backgroundPath,
             frameOverlayPath: frameOverlayPath,
-            images: await Future.wait(preprocessedImages),
+            images: preprocessedImages,
             transparents: transparent,
             params: appState.imageParam.pansAndScales,
             flip: appState.imageParam.isFlipped);
@@ -158,7 +149,7 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
         printingImage = await _ffmpegUtils.mergeImage(
             backgroundPath: backgroundPath,
             frameOverlayPath: frameOverlayPath,
-            images: await Future.wait(preprocessedImages),
+            images: preprocessedImages,
             transparents: transparent,
             params: appState.imageParam.pansAndScales,
             flip: appState.imageParam.isFlipped);
@@ -258,6 +249,33 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
     //     file.deleteSync();
     //   }
     // }
+  }
+
+  Future<List<String>> _preprocessPrintImages() async {
+    final results = <String>[];
+    final images = appState.imageParam.images;
+    for (var index = 0; index < images.length; index++) {
+      final imagePath = images[index];
+      final stopwatch = Stopwatch()..start();
+      logD(
+        'Printing preprocess image start: ${index + 1}/${images.length} $imagePath',
+      );
+      final outputPath = await _ffmpegUtils.preprocessImage(
+        imagePath: imagePath,
+        effect: appState.imageParam.effect,
+        filter: appState.imageParam.colorFilter,
+        isFlip: appState.imageParam.isFlipped,
+      );
+      if (outputPath.isEmpty || !File(outputPath).existsSync()) {
+        throw StateError('Could not preprocess print image: $imagePath');
+      }
+      logD(
+        'Printing preprocess image done: ${index + 1}/${images.length} '
+        'elapsed=${stopwatch.elapsedMilliseconds}ms output=$outputPath',
+      );
+      results.add(outputPath);
+    }
+    return results;
   }
 
   String _resolveMockPrintImage({

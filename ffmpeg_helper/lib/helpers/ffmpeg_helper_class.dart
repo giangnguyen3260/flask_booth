@@ -88,16 +88,19 @@ class FFMpegHelper {
   Future<File?> runSync(
     FFMpegCommand command, {
     Function(Statistics statistics)? statisticsCallback,
+    Duration? timeout,
   }) async {
     if (Platform.isWindows || Platform.isLinux) {
       return _runSyncOnWindows(
         command,
         statisticsCallback: statisticsCallback,
+        timeout: timeout,
       );
     } else {
       return _runSyncOnNonWindows(
         command,
         statisticsCallback: statisticsCallback,
+        timeout: timeout,
       );
     }
   }
@@ -192,12 +195,20 @@ class FFMpegHelper {
   Future<File?> _runSyncOnWindows(
     FFMpegCommand command, {
     Function(Statistics statistics)? statisticsCallback,
+    Duration? timeout,
   }) async {
     Process process = await _startWindowsProcess(
       command,
       statisticsCallback: statisticsCallback,
     );
-    if (await process.exitCode == ReturnCode.success) {
+    final exitCode = await process.exitCode.timeout(
+      timeout ?? const Duration(days: 365),
+      onTimeout: () {
+        process.kill(ProcessSignal.sigkill);
+        return -1;
+      },
+    );
+    if (exitCode == ReturnCode.success) {
       process.kill();
       return File(command.outputFilepath);
     } else {
@@ -209,11 +220,23 @@ class FFMpegHelper {
   Future<File?> _runSyncOnNonWindows(
     FFMpegCommand command, {
     Function(Statistics statistics)? statisticsCallback,
+    Duration? timeout,
   }) async {
     Completer<File?> completer = Completer<File?>();
-    await FFmpegKit.executeAsync(
+    FFmpegSession? runningSession;
+    Timer? timeoutTimer;
+    if (timeout != null) {
+      timeoutTimer = Timer(timeout, () async {
+        if (!completer.isCompleted) {
+          await runningSession?.cancel();
+          completer.complete(null);
+        }
+      });
+    }
+    runningSession = await FFmpegKit.executeAsync(
       command.toCli().join(' '),
       (FFmpegSession session) async {
+        timeoutTimer?.cancel();
         final code = await session.getReturnCode();
         if (code?.isValueSuccess() == true) {
           if (!completer.isCompleted) {
