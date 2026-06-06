@@ -135,7 +135,7 @@ class ShootingScreenProvider extends BaseProvider<ShootingScreenListenState> {
   void onNextEvent() async {
     isLoading = true;
     notifyListeners();
-    final timeout = DateTime.now().add(const Duration(seconds: 20));
+    final timeout = DateTime.now().add(const Duration(seconds: 90));
     while (tImages.length != shotCount ||
         tVideos.length != shotCount ||
         tVideos.length != tImages.length) {

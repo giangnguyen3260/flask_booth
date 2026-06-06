@@ -68,12 +68,19 @@ class BillAcceptorUtils with LogMixin {
       var result = _serialPort.openReadWrite();
       if (result) {
         logD("${_serialPort.name ?? ""} connects successfully");
-        _serialPort.config = SerialPortConfig()
+        final config = SerialPortConfig()
           ..baudRate = 9600
           ..stopBits = 1
           ..bits = 8
           ..parity = SerialPortParity.none
           ..setFlowControl(SerialPortFlowControl.none);
+        if (_readBoolConfig("rts")) {
+          config.rts = SerialPortRts.on;
+        }
+        if (_readBoolConfig("dtr")) {
+          config.dtr = SerialPortDtr.on;
+        }
+        _serialPort.config = config;
         _serialPortReader = SerialPortReader(_serialPort, timeout: 10);
 
         _serialPortReader.stream.listen((Uint8List value) {
@@ -107,6 +114,17 @@ class BillAcceptorUtils with LogMixin {
     } catch (e) {
       return false;
     }
+  }
+
+  bool _readBoolConfig(String key) {
+    final value = _billAcceptorConfig[key];
+    if (value is bool) return value;
+    if (value is num) return value != 0;
+    if (value is String) {
+      final normalized = value.trim().toLowerCase();
+      return normalized == "true" || normalized == "1" || normalized == "yes";
+    }
+    return false;
   }
 
   void _emitResponse(String rawData, Object dataRes) {

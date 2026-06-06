@@ -29,9 +29,23 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
   String _resolveSceneBackgroundPath(String frameOverlayPath) {
     final selectedBackground = appState.imageParam.selectedBackground;
     final backgroundPath = selectedBackground.bgUrl ?? '';
-    if (backgroundPath.isNotEmpty) {
+    if (backgroundPath.isNotEmpty && File(backgroundPath).existsSync()) {
       return backgroundPath;
     }
+
+    final frameBackgroundInfo =
+        appState.imageParam.selectedFrame.backgroundInfo ?? [];
+    for (final category in frameBackgroundInfo) {
+      for (final background in category.background ?? []) {
+        final candidate = background.bgUrl ?? '';
+        if (candidate.isNotEmpty && File(candidate).existsSync()) {
+          logD('Printing background fallback: $candidate');
+          return candidate;
+        }
+      }
+    }
+
+    logE('Printing background missing, fallback to frame overlay');
     return frameOverlayPath;
   }
 
@@ -160,20 +174,26 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
       finalPrintImagePath = printingImage;
       notifyListeners();
 
+      final selectedVideos = _resolveSelectedVideoPaths();
       final videoPaths = <String>[];
-      if (appState.imageParam.videos.isNotEmpty) {
+      if (selectedVideos.isNotEmpty) {
         preparationStatus = 'Preparing video...';
         notifyListeners();
-        logD('Printing merge video start');
+        logD('Printing merge video start: videos=${selectedVideos.length}');
         var mergedVideo = await _ffmpegUtils.mergeVideo(
             backgroundPath: backgroundPath,
             frameOverlayPath: frameOverlayPath,
-            videos: appState.imageParam.videos,
+            videos: selectedVideos,
             transparents: transparent,
             params: appState.imageParam.pansAndScales,
             flip: appState.imageParam.isFlipped);
         videoPaths.add(mergedVideo);
         logD('Printing merge video done: $mergedVideo');
+      } else {
+        logE(
+          'Printing merge video skipped: no valid video files '
+          'from ${appState.imageParam.videos.length} selected paths',
+        );
       }
 
       preparationStatus = 'Saving upload for later...';
@@ -301,6 +321,17 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
     return appState.imageParam.videos
         .where((path) => path.isNotEmpty && File(path).existsSync())
         .toList();
+  }
+
+  List<String> _resolveSelectedVideoPaths() {
+    final supportedExtensions = {'.mp4', '.mov', '.webm', '.mkv', '.avi'};
+    return appState.imageParam.videos.where((videoPath) {
+      if (videoPath.isEmpty || !File(videoPath).existsSync()) {
+        return false;
+      }
+      final extension = videoPath.split('.').lastOrNull?.trim().toLowerCase();
+      return extension != null && supportedExtensions.contains('.$extension');
+    }).toList();
   }
 
   int _resolvePrintCopies({required bool isCut}) {

@@ -17,7 +17,7 @@ import 'package:project_l/gen/assets.gen.dart';
 @Singleton()
 class FfmpegUtils {
   static const Duration _imageMergeTimeout = Duration(seconds: 90);
-  static const Duration _videoMergeTimeout = Duration(minutes: 3);
+  static const Duration _videoMergeTimeout = Duration(minutes: 8);
   static const int _imageMergeThreads = 1;
   static const int _videoMergeThreads = 2;
 
@@ -298,12 +298,8 @@ class FfmpegUtils {
     command.add(frameOverlayPath);
 
     String filterComplex = '';
-    filterComplex += '[0:v] format=rgba [bg_rgba];';
     filterComplex +=
-        '[${images.length + 1}:v] format=rgba,alphaextract [frame_alpha];';
-    filterComplex += '[bg_rgba][frame_alpha] alphamerge [bg_masked];';
-    filterComplex +=
-        '[bg_masked] pad=width=ceil(iw/2)*2:height=ceil(ih/2)*2 [bg_padded1];';
+        '[0:v] format=rgba,pad=width=ceil(iw/2)*2:height=ceil(ih/2)*2 [bg_padded1];';
     String lastOutput = '[bg_padded1]';
 
     for (int i = 0; i < images.length; i++) {
@@ -414,7 +410,7 @@ class FfmpegUtils {
             "-cpu-used",
             "8",
             "-threads",
-            "8",
+            "2",
             '-y',
             '-q:v',
             '2',
