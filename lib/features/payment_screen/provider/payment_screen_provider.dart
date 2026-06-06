@@ -64,15 +64,18 @@ class PaymentScreenProvider extends BaseProvider<PaymentScreenListenState> {
 
   void _billAcceptorListen(BillAcceptorResponseEnum data) {
     var type = data.getType();
+    logD('Bill acceptor event: ${data.name}');
     if (type == BillAcceptorTypeEnum.cashValue) {
       if (_billAcceptorUtils.accept()) {
         _cameraPowerUtil.turnOnCamera();
         _cash.add(data);
+        logD('Accepted bill event queued: ${data.name}');
       }
     } else if (data == BillAcceptorResponseEnum.stacking) {
       while (_cash.isNotEmpty) {
         final cashMoney = _cash.removeFirst().getMoneyValue();
         currentAmount = currentAmount + cashMoney;
+        logD('Stacked bill amount: $cashMoney, currentAmount: $currentAmount');
       }
       notifyListeners();
       checkMoneyValue();

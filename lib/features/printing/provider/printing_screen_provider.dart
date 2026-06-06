@@ -174,7 +174,7 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
 
       var size = appState.imageParam.selectedFrame.getSize();
       logD('Printing print job start: $printingImage');
-      _printerUtils.printImage(
+      await _printerUtils.printImage(
           file: File(printingImage),
           numCut: isCut
               ? (appState.imageParam.printQuantity / 2).toInt()

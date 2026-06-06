@@ -52,6 +52,7 @@ class AppState extends ChangeNotifier with LogMixin {
   String currentScreen = 'STANDBY';
   String cameraMode = 'canon';
   bool _hasLocalRuntimeConfig = false;
+  bool _hasConfiguredRemoteApi = false;
   final CameraPowerUtil cameraPowerUtil = getIt.get();
   final CameraUtils cameraUtils = getIt.get();
   async.Timer? _heartbeatTimer;
@@ -131,7 +132,8 @@ class AppState extends ChangeNotifier with LogMixin {
     final remoteApiConfig = _readConfigSection("remote_api");
     _hasLocalRuntimeConfig = appConfig.isNotEmpty;
 
-    if (!isMockCameraMode && cameraConfig.isNotEmpty) {
+    final cameraPowerPort = _readConfigValue(cameraConfig, const ["port"]);
+    if (!isMockCameraMode && cameraPowerPort.isNotEmpty) {
       cameraPowerUtil.cameraPowerConfig = cameraConfig;
       cameraPowerUtil.connect();
     }
@@ -140,6 +142,8 @@ class AppState extends ChangeNotifier with LogMixin {
     if (!isMockCameraMode && billAcceptorConfig.isNotEmpty) {
       billAcceptorUtils.billAcceptorConfig = billAcceptorConfig;
       billAcceptorUtils.connect();
+    } else if (!isMockCameraMode) {
+      logE("Bill acceptor config is empty");
     }
 
     kioskCode =
@@ -157,18 +161,23 @@ class AppState extends ChangeNotifier with LogMixin {
           ? 'mock'
           : 'canon';
     }
-    remoteApiBaseUrl = Platform.environment['PTB_BASE_URL'] ??
-        _readConfigValue(
-          remoteApiConfig,
-          const ["baseUrl", "base_url"],
-        );
+    final ptbBaseUrl = Platform.environment['PTB_BASE_URL']?.trim() ?? '';
+    final remoteApiConfigBaseUrl = _readConfigValue(
+      remoteApiConfig,
+      const ["baseUrl", "base_url"],
+    );
+    final appBaseUrl = Platform.environment['APP_BASE_URL']?.trim() ?? '';
+    final serverConfigBaseUrl = _readConfigValue(
+      serverConfig,
+      const ["baseUrl", "base_url"],
+    );
+    remoteApiBaseUrl =
+        ptbBaseUrl.isNotEmpty ? ptbBaseUrl : remoteApiConfigBaseUrl;
     if (remoteApiBaseUrl.isEmpty) {
-      remoteApiBaseUrl = Platform.environment['APP_BASE_URL'] ??
-          _readConfigValue(
-            serverConfig,
-            const ["baseUrl", "base_url"],
-          );
+      remoteApiBaseUrl =
+          appBaseUrl.isNotEmpty ? appBaseUrl : serverConfigBaseUrl;
     }
+    _hasConfiguredRemoteApi = remoteApiBaseUrl.isNotEmpty;
     if (remoteApiBaseUrl.isEmpty &&
         !kReleaseMode &&
         (Platform.isMacOS || Platform.isWindows || Platform.isLinux)) {
@@ -283,7 +292,7 @@ class AppState extends ChangeNotifier with LogMixin {
     if (override == 'true' || override == '1') {
       return true;
     }
-    return !kReleaseMode && !_hasLocalRuntimeConfig;
+    return !kReleaseMode && !_hasLocalRuntimeConfig && !_hasConfiguredRemoteApi;
   }
 
   Future<String> _resolveImagePath(String? source) async {
@@ -326,11 +335,14 @@ class AppState extends ChangeNotifier with LogMixin {
         baseUri.host == '127.0.0.1') {
       return value;
     }
-    return assetUri
+    final basePath = baseUri.path.endsWith('/')
+        ? baseUri.path.substring(0, baseUri.path.length - 1)
+        : baseUri.path;
+    return baseUri
         .replace(
-          scheme: baseUri.scheme,
-          host: baseUri.host,
-          port: baseUri.hasPort ? baseUri.port : null,
+          path: '$basePath${assetUri.path}',
+          query: assetUri.hasQuery ? assetUri.query : null,
+          fragment: assetUri.hasFragment ? assetUri.fragment : null,
         )
         .toString();
   }

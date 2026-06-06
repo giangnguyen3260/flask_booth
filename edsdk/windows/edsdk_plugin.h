@@ -7,6 +7,7 @@
 #include "flutter_edsdk.h"
 #include <shlobj.h>  // For SHGetFolderPath
 #include <memory>
+#include <vector>
 #include "utils/object_utils.cpp"
 #include "models/xfile.cpp"
 
@@ -35,6 +36,7 @@ namespace edsdk {
         std::unique_ptr <EDSDKOutlet> edsdkOutlet;
         std::unique_ptr <FlutterEdsdk> flutterEdsdk;
         std::string baseVidPath;
+        std::vector<uint8_t> previewBuffer;
     };
 
 }  // namespace edsdk

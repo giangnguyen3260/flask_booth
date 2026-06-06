@@ -36,6 +36,10 @@ public:
 
     bool stopLivePreview();
 
+    std::string downloadEvfImage(const std::string& outputPath);
+
+    std::vector<uint8_t> downloadEvfBytes();
+
     bool startRecord();
 
     bool stopRecord();

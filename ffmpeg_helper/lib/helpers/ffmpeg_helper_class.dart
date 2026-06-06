@@ -12,7 +12,6 @@ class FFMpegHelper {
   FFMpegHelper._internal();
   static FFMpegHelper get instance => _singleton;
 
-
   Future<FFMpegHelperSession> runAsync(
     FFMpegCommand command, {
     Function(Statistics statistics)? statisticsCallback,
@@ -107,7 +106,7 @@ class FFMpegHelper {
     FFMpegCommand command, {
     Function(Statistics statistics)? statisticsCallback,
   }) async {
-    String ffmpeg = 'ffmpeg';
+    final String ffmpeg = _resolveFfmpegExecutable();
     Process process = await Process.start(
       ffmpeg,
       command.toCli(),
@@ -151,6 +150,43 @@ class FFMpegHelper {
       }
     });
     return process;
+  }
+
+  String _resolveFfmpegExecutable() {
+    if (!Platform.isWindows) {
+      return 'ffmpeg';
+    }
+
+    final candidates = <String>[];
+
+    final localAppData = Platform.environment['LOCALAPPDATA'];
+    if (localAppData != null && localAppData.isNotEmpty) {
+      final packageRoot =
+          Directory('$localAppData\\Microsoft\\WinGet\\Packages');
+      if (packageRoot.existsSync()) {
+        for (final entity in packageRoot.listSync(recursive: true)) {
+          if (entity is File &&
+              entity.path.toLowerCase().endsWith('\\bin\\ffmpeg.exe')) {
+            candidates.add(entity.path);
+          }
+        }
+      }
+      candidates.addAll([
+        '$localAppData\\Microsoft\\WinGet\\Links\\ffmpeg.exe',
+        '$localAppData\\Microsoft\\WindowsApps\\ffmpeg.exe',
+      ]);
+    }
+
+    for (final candidate in candidates) {
+      try {
+        if (File(candidate).existsSync()) {
+          return candidate;
+        }
+      } catch (_) {
+        // Keep probing candidates; some package folders are protected.
+      }
+    }
+    return 'ffmpeg';
   }
 
   Future<File?> _runSyncOnWindows(
@@ -324,5 +360,4 @@ class FFMpegHelper {
     );
     return session;
   }
-
 }

@@ -1,5 +1,7 @@
 #include "flutter_edsdk.h"
 
+#include <cstdio>
+
 
 FlutterEdsdk::FlutterEdsdk() {
     // Constructor logic
@@ -114,6 +116,87 @@ bool FlutterEdsdk::stopLivePreview() {
     return err == EDS_ERR_OK;
 }
 
+std::string FlutterEdsdk::downloadEvfImage(const std::string& outputPath) {
+    EdsStreamRef stream = nullptr;
+    EdsEvfImageRef evfImage = nullptr;
+    EdsVoid* buffer = nullptr;
+    EdsUInt64 length = 0;
+
+    EdsError err = EdsCreateMemoryStream(0, &stream);
+    if (err != EDS_ERR_OK) {
+        std::cerr << "Failed to create EVF memory stream. Error: " << err << std::endl;
+        return "";
+    }
+
+    err = EdsCreateEvfImageRef(stream, &evfImage);
+    if (err == EDS_ERR_OK) {
+        err = EdsDownloadEvfImage(camera, evfImage);
+    }
+    if (err == EDS_ERR_OK) {
+        err = EdsGetLength(stream, &length);
+    }
+    if (err == EDS_ERR_OK) {
+        err = EdsGetPointer(stream, &buffer);
+    }
+    if (err == EDS_ERR_OK && buffer != nullptr && length > 0) {
+        FILE* file = nullptr;
+        fopen_s(&file, outputPath.c_str(), "wb");
+        if (file != nullptr) {
+            fwrite(buffer, 1, static_cast<size_t>(length), file);
+            fclose(file);
+        } else {
+            std::cerr << "Failed to open EVF output file: " << outputPath << std::endl;
+            err = EDS_ERR_FILE_IO_ERROR;
+        }
+    }
+
+    if (evfImage != nullptr) {
+        EdsRelease(evfImage);
+    }
+    if (stream != nullptr) {
+        EdsRelease(stream);
+    }
+
+    return err == EDS_ERR_OK ? outputPath : "";
+}
+
+std::vector<uint8_t> FlutterEdsdk::downloadEvfBytes() {
+    EdsStreamRef stream = nullptr;
+    EdsEvfImageRef evfImage = nullptr;
+    EdsVoid* buffer = nullptr;
+    EdsUInt64 length = 0;
+    std::vector<uint8_t> bytes;
+
+    EdsError err = EdsCreateMemoryStream(0, &stream);
+    if (err != EDS_ERR_OK) {
+        std::cerr << "Failed to create EVF memory stream. Error: " << err << std::endl;
+        return bytes;
+    }
+
+    err = EdsCreateEvfImageRef(stream, &evfImage);
+    if (err == EDS_ERR_OK) {
+        err = EdsDownloadEvfImage(camera, evfImage);
+    }
+    if (err == EDS_ERR_OK) {
+        err = EdsGetLength(stream, &length);
+    }
+    if (err == EDS_ERR_OK) {
+        err = EdsGetPointer(stream, &buffer);
+    }
+    if (err == EDS_ERR_OK && buffer != nullptr && length > 0) {
+        auto start = static_cast<uint8_t*>(buffer);
+        bytes.assign(start, start + static_cast<size_t>(length));
+    }
+
+    if (evfImage != nullptr) {
+        EdsRelease(evfImage);
+    }
+    if (stream != nullptr) {
+        EdsRelease(stream);
+    }
+
+    return bytes;
+}
 
 bool FlutterEdsdk::startRecord() {
     // Assuming camera is already connected and initialized

@@ -116,21 +116,13 @@ class CommonImageFile extends StatelessWidget {
       );
     }
 
-    return FadeInImage(
-      placeholder: MemoryImage(_kTransparentImage),
-      image: ResizeImage(
-        FileImage(file),
-        width: scaledWidth,
-        height: scaledHeight,
-        allowUpscaling: true,
-        policy: policy == CustomResizeImagePolicy.exact
-            ? ResizeImagePolicy.exact
-            : ResizeImagePolicy.fit,
-      ),
+    return Image.memory(
+      file.readAsBytesSync(),
+      key: ValueKey('${file.path}:${file.lastModifiedSync().microsecondsSinceEpoch}'),
       width: widgetWidth,
       height: widgetHeight,
       fit: fit,
-      imageErrorBuilder: (context, error, stackTrace) {
+      errorBuilder: (context, error, stackTrace) {
         return SizedBox(
           width: widgetWidth,
           height: widgetHeight,

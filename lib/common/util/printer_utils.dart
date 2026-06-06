@@ -31,6 +31,7 @@ class PrinterUtils {
     int numCut = 0,
     required OrientationEnum orientation,
   }) async {
+    print('PrinterUtils.printImage file=${file.path} copies=$numCut');
     final doc = pw.Document();
 
     Uint8List bytes = file.readAsBytesSync();
@@ -50,11 +51,15 @@ class PrinterUtils {
         },
       ),
     );
-    Printer printer = (await Printing.listPrinters()).lastWhere(
-          (e) => e.name.contains(PrinterConstants.printerName),
+    final printers = await Printing.listPrinters();
+    print('PrinterUtils.availablePrinters=${printers.map((e) => e.name).join(', ')}');
+    Printer printer = printers.lastWhere(
+      (e) => e.name.contains(PrinterConstants.printerName),
     );
+    print('PrinterUtils.selectedPrinter=${printer.name}');
 
     for (int i = 0; i < numCut; i++) {
+      print('PrinterUtils.directPrintPdf copy=${i + 1}/$numCut');
       await Printing.directPrintPdf(
         format: format,
         usePrinterSettings: true,
@@ -75,6 +80,9 @@ class PrinterUtils {
   * This function is used to change printer setting
   * */
   Future<bool> changeCutMode(PrinterCutMode cutMode) async {
+    print('PrinterUtils.changeCutMode skipped: $cutMode');
+    return true;
+
     String executablePath = Platform.resolvedExecutable;
     String executableDir = path.dirname(executablePath);
     String cmd =

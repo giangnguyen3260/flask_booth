@@ -14,7 +14,10 @@ EDSDKOutlet::EDSDKOutlet(flutter::TextureRegistrar* texture_registrar)
 void EDSDKOutlet::MarkEDSDKFrameAvailable(uint8_t* buffer, int32_t width,
                                           int32_t height) {
     const std::lock_guard<std::mutex> lock(mutex_);
-    flutter_pixel_buffer_.buffer = buffer;
+    const auto buffer_size = static_cast<size_t>(width) *
+                             static_cast<size_t>(height) * 4;
+    pixel_buffer_storage_.assign(buffer, buffer + buffer_size);
+    flutter_pixel_buffer_.buffer = pixel_buffer_storage_.data();
     flutter_pixel_buffer_.width = width;
     flutter_pixel_buffer_.height = height;
     texture_registrar_->MarkTextureFrameAvailable(texture_id_);

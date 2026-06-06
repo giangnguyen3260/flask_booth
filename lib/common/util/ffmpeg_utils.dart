@@ -183,7 +183,7 @@ class FfmpegUtils {
 
   Future<String> mergeHorizontalImage({required String imagePath}) async {
     var imageOutput = path.join(_savedImagePath,
-        "Output_${DateTimeUtils.format(date: DateTime.now(), format: "dd_MM_yyyy_HH_mm")}.png");
+        "Print_${DateTimeUtils.format(date: DateTime.now(), format: "dd_MM_yyyy_HH_mm_ss")}.png");
 
     await FFMpegHelper.instance.runSync(
       FFMpegCommand(outputFilepath: imageOutput, inputs: [
@@ -403,6 +403,32 @@ class FfmpegUtils {
           ]),
         ]),
         onComplete: onComplete);
+  }
+
+  Future<File?> encodeLiveViewFrames({
+    required String framePattern,
+    required int fps,
+  }) async {
+    final videoOutput = path.join(_savedVideoPath,
+        "LiveView_${DateTimeUtils.format(date: DateTime.now(), format: "dd_MM_yyyy_HH_mm_ss")}.mp4");
+    return FFMpegHelper.instance.runSync(
+      FFMpegCommand(outputFilepath: videoOutput, inputs: [
+        FFMpegInput([
+          '-framerate',
+          '$fps',
+          '-i',
+          framePattern,
+          '-c:v',
+          'libx264',
+          '-preset',
+          'ultrafast',
+          '-pix_fmt',
+          'yuv420p',
+          '-movflags',
+          '+faststart',
+        ]),
+      ]),
+    );
   }
 
   static int roundToNearestEven(double value) {

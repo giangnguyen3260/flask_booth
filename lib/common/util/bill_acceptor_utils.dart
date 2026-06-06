@@ -72,19 +72,30 @@ class BillAcceptorUtils with LogMixin {
           ..baudRate = 9600
           ..stopBits = 1
           ..bits = 8
-          ..parity = SerialPortFlowControl.none
+          ..parity = SerialPortParity.none
           ..setFlowControl(SerialPortFlowControl.none);
         _serialPortReader = SerialPortReader(_serialPort, timeout: 10);
 
         _serialPortReader.stream.listen((Uint8List value) {
           try {
             var rawData = StringUtils.bytesToHexWithSpaces(value);
-            var dataRes = _billAcceptorConfig[rawData.toString()];
-            BillAcceptorResponseEnum enumData =
-                BillAcceptorResponseEnum.fromValue(dataRes);
-            _stream.sink.add(enumData);
+            logD("Bill acceptor raw: $rawData");
+            final rawResponse = _billAcceptorConfig[rawData.toString()];
+            if (rawResponse != null) {
+              _emitResponse(rawData, rawResponse);
+              return;
+            }
+            for (final byte in value) {
+              final hex = byte.toRadixString(16).padLeft(2, '0').toUpperCase();
+              final dataRes = _billAcceptorConfig[hex];
+              if (dataRes == null) {
+                logE("Unknown bill acceptor response: $hex");
+                continue;
+              }
+              _emitResponse(hex, dataRes);
+            }
           } catch (e) {
-            //
+            logE(e);
           }
         }, onError: (error) {
           logE(error);
@@ -95,6 +106,19 @@ class BillAcceptorUtils with LogMixin {
       return result;
     } catch (e) {
       return false;
+    }
+  }
+
+  void _emitResponse(String rawData, Object dataRes) {
+    final enumData = BillAcceptorResponseEnum.fromValue(dataRes.toString());
+    if (enumData == BillAcceptorResponseEnum.unknown) {
+      logE("Unknown bill acceptor response mapping: $rawData -> $dataRes");
+      return;
+    }
+    logD("Bill acceptor response: ${enumData.name}");
+    _stream.sink.add(enumData);
+    if (enumData == BillAcceptorResponseEnum.powerOn) {
+      _send(command: BillAcceptorCommand.start);
     }
   }
 

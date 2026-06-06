@@ -6,6 +6,7 @@
 #include <flutter/standard_method_codec.h>
 
 #include <mutex>
+#include <vector>
 
 class EDSDKOutlet {
 public:
@@ -18,6 +19,7 @@ public:
     ~EDSDKOutlet();
 
 private:
+    std::vector<uint8_t> pixel_buffer_storage_;
     FlutterDesktopPixelBuffer flutter_pixel_buffer_{};
     flutter::TextureRegistrar* texture_registrar_ = nullptr;
     std::unique_ptr<flutter::TextureVariant> texture_ = nullptr;

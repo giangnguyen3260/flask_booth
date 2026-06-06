@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:edsdk/models/camera_model.dart';
 import 'package:edsdk/models/xfile.dart';
@@ -56,8 +57,32 @@ class MethodChannelEdsdk extends EdsdkPlatform {
   }
 
   @override
-  Future<String> downloadEvf() async {
-    return await methodChannel.invokeMethod("download_evf");
+  Future<String> downloadEvf({String? fileName}) async {
+    return await methodChannel.invokeMethod("download_evf", {
+      "file_name": fileName,
+    });
+  }
+
+  @override
+  Future<Uint8List> downloadEvfBytes() async {
+    return await methodChannel.invokeMethod<Uint8List>("download_evf_bytes") ??
+        Uint8List(0);
+  }
+
+  @override
+  Future<bool> downloadEvfTexture() async {
+    return await methodChannel.invokeMethod<bool>("download_evf_texture") ??
+        false;
+  }
+
+  @override
+  Future<bool> startRecord() async {
+    return await methodChannel.invokeMethod<bool>("start_record") ?? false;
+  }
+
+  @override
+  Future<bool> stopRecord() async {
+    return await methodChannel.invokeMethod<bool>("stop_record") ?? false;
   }
 
   @override

@@ -14,6 +14,7 @@ import 'package:project_l/features/stand_by/provider/stand_by_provider.dart';
 import 'package:project_l/resources/app_text_style.dart';
 import 'package:project_l/resources/flashy_booth_theme.dart';
 import 'package:provider/provider.dart';
+import 'package:window_manager/window_manager.dart';
 
 @RoutePage()
 class StandByScreen extends StatefulWidget {
@@ -200,6 +201,11 @@ class _StandByScreenState
                     },
                   ),
                 ),
+                Positioned(
+                  right: 120.w,
+                  bottom: 72.h,
+                  child: const _CloseAppButton(),
+                ),
               ],
             );
           },
@@ -239,6 +245,36 @@ class _StandByScreenState
         });
       }
     }
+  }
+}
+
+class _CloseAppButton extends StatelessWidget {
+  const _CloseAppButton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: 'Close app',
+      child: SizedBox(
+        width: 58.w,
+        height: 58.w,
+        child: Material(
+          color: Colors.white.withValues(alpha: 0.65),
+          shape: const CircleBorder(),
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: windowManager.close,
+            child: Center(
+              child: Icon(
+                Icons.power_settings_new_rounded,
+                color: FlashyBoothColors.pink,
+                size: 27.r,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 

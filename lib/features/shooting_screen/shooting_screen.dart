@@ -13,6 +13,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get_it/get_it.dart';
 import 'package:path/path.dart' as path;
 import 'package:project_l/common/constants/enum/e_aspect_ratio.dart';
+import 'package:project_l/common/log/log_mixin.dart';
 import 'package:project_l/common/navigator/app_router.gr.dart';
 import 'package:project_l/common/provider/base_page_state.dart';
 import 'package:project_l/common/util/directory_utils.dart';
@@ -70,7 +71,13 @@ class _ShootingScreenState extends BasePageState<ShootingScreenListenState,
   }
 
   Timer? t;
+  Timer? _canonPreviewTimer;
+  _LiveViewShotRecorder? _liveViewShotRecorder;
   String? _mockCapturePath;
+  String? _lastCapturedImagePath;
+  int? _canonTextureId;
+  bool _isCanonRecording = false;
+  int _canonShotVideoIndex = 0;
 
   final ValueNotifier<bool> _shutter = ValueNotifier(false);
 
@@ -85,20 +92,44 @@ class _ShootingScreenState extends BasePageState<ShootingScreenListenState,
       t = Timer.periodic(Duration(seconds: 1), (timer) async {
         List<CameraModel> cameraList =
             await appState.cameraUtils.getCameraList();
+        logD('Canon camera list: $cameraList');
         if (cameraList.isNotEmpty) {
           timer.cancel();
-          await appState.cameraUtils.initCamera(0);
-          await appState.cameraUtils.openSession();
-          await appState.cameraUtils.saveToHost();
-          _hasCanonSession = true;
+          final textureId = await appState.cameraUtils.initCamera(0);
+          logD('Canon initCamera textureId=$textureId');
+          if (textureId >= 0 && mounted) {
+            setState(() {
+              _canonTextureId = textureId;
+            });
+          }
+          final opened = await appState.cameraUtils.openSession();
+          logD('Canon openSession=$opened');
+          final savedToHost = await appState.cameraUtils.saveToHost();
+          logD('Canon saveToHost=$savedToHost');
+          _hasCanonSession = opened;
+          if (opened) {
+            final previewStarted = await appState.cameraUtils.startPreview();
+            logD('Canon startPreview=$previewStarted');
+            if (previewStarted) {
+              _startCanonPreviewPolling();
+            }
+          }
         }
       });
 
       appState.cameraUtils.setObjectHandler(handler: (call) async {
         if (call.method == 'file_created') {
-          provider.saveImage(imagePath: call.arguments as String);
+          final imagePath = call.arguments as String;
+          logD('Canon file_created: $imagePath');
+          if (mounted) {
+            setState(() {
+              _lastCapturedImagePath = imagePath;
+            });
+          }
+          provider.saveImage(imagePath: imagePath);
           if (provider.uiImages.length < shotCount) {
             _commonCounterController.reset();
+            await _startLiveViewRecordingForNextShot();
           } else {
             if (mounted) {
               _commonCounterController.stop();
@@ -130,6 +161,13 @@ class _ShootingScreenState extends BasePageState<ShootingScreenListenState,
               // navigator.replaceAll([PhotoSelectionRoute(files: provider.files)]);
             }
           }
+        } else if (call.method == 'video_created') {
+          final videoPath = call.arguments as String;
+          logD('Canon video_created: $videoPath');
+          provider.saveVideo(
+            videoPath: videoPath,
+            second: shootingTime - 1,
+          );
         }
       });
     }
@@ -212,6 +250,25 @@ class _ShootingScreenState extends BasePageState<ShootingScreenListenState,
     }
   }
 
+  void _startCanonPreviewPolling() {
+    _canonPreviewTimer?.cancel();
+    var isDownloading = false;
+    _canonPreviewTimer =
+        Timer.periodic(const Duration(milliseconds: 66), (timer) async {
+      if (!mounted || isDownloading) {
+        return;
+      }
+      isDownloading = true;
+      try {
+        await appState.cameraUtils.downloadEvfTexture();
+      } catch (error, stackTrace) {
+        logE(error, stackTrace: stackTrace);
+      } finally {
+        isDownloading = false;
+      }
+    });
+  }
+
   CameraDescription _pickPreferredCamera(List<CameraDescription> cameras) {
     final preferred = _firstCameraWhere(cameras, (camera) {
       final name = camera.name.toLowerCase();
@@ -258,6 +315,9 @@ class _ShootingScreenState extends BasePageState<ShootingScreenListenState,
   @override
   void dispose() {
     if (!isMockCameraMode) {
+      _canonPreviewTimer?.cancel();
+      _liveViewShotRecorder?.cancel();
+      appState.cameraUtils.stopPreview();
       appState.cameraUtils.closeSession();
     }
     controller?.dispose();
@@ -290,7 +350,64 @@ class _ShootingScreenState extends BasePageState<ShootingScreenListenState,
     _isReadyGoVisible = false;
     _commonCounterController.start();
     _commonCounterController.addListener(_handleShotCountdown);
+    if (!isMockCameraMode && _hasCanonSession) {
+      unawaited(_startLiveViewRecordingForNextShot());
+    }
     setState(() {});
+  }
+
+  Future<void> _startLiveViewRecordingForNextShot() async {
+    if (isMockCameraMode || !_hasCanonSession) {
+      return;
+    }
+    _canonShotVideoIndex++;
+    final ffmpegUtils = GetIt.instance.get<FfmpegUtils>();
+    final recorder = _LiveViewShotRecorder(
+      cameraUtils: appState.cameraUtils,
+      ffmpegUtils: ffmpegUtils,
+      sessionId: appState.imageParam.session,
+      shotIndex: _canonShotVideoIndex,
+      logD: logD,
+      logE: (error, stackTrace) => logE(error, stackTrace: stackTrace),
+    );
+    _liveViewShotRecorder = recorder;
+    await recorder.start();
+  }
+
+  void _stopLiveViewRecordingForCurrentShot() {
+    final recorder = _liveViewShotRecorder;
+    if (recorder == null) {
+      return;
+    }
+    _liveViewShotRecorder = null;
+    unawaited(recorder.stopAndEncode().then((videoFile) {
+      if (videoFile == null) {
+        logE('LiveView video encode failed');
+        return;
+      }
+      provider.saveVideo(
+        videoPath: videoFile.path,
+        second: shootingTime - 1,
+      );
+    }));
+  }
+
+  Future<void> _startCanonRecordIfNeeded() async {
+    if (isMockCameraMode || !_hasCanonSession || _isCanonRecording) {
+      return;
+    }
+    final started = await appState.cameraUtils.startRecord();
+    logD('Canon startRecord=$started');
+    _isCanonRecording = started;
+  }
+
+  Future<void> _stopCanonRecordIfNeeded() async {
+    if (!_isCanonRecording) {
+      return;
+    }
+    final stopped = await appState.cameraUtils.stopRecord();
+    logD('Canon stopRecord=$stopped');
+    _isCanonRecording = !stopped;
   }
 
   Future<void> _handleShotCountdown() async {
@@ -298,6 +415,11 @@ class _ShootingScreenState extends BasePageState<ShootingScreenListenState,
       if (isMockCameraMode) {
         final imagePath = await _ensureMockCapturePath();
         await provider.saveMockCapture(imagePath: imagePath);
+        if (mounted) {
+          setState(() {
+            _lastCapturedImagePath = provider.latestPreviewImagePath ?? imagePath;
+          });
+        }
         _shutter.value = true;
         if (provider.uiImages.length < shotCount) {
           _commonCounterController.reset();
@@ -317,6 +439,12 @@ class _ShootingScreenState extends BasePageState<ShootingScreenListenState,
             imagePath: imageFile.path,
             videoPath: videoFile?.path,
           );
+          if (mounted) {
+            setState(() {
+              _lastCapturedImagePath =
+                  provider.latestPreviewImagePath ?? imageFile.path;
+            });
+          }
           if (provider.uiImages.length < shotCount) {
             _commonCounterController.reset();
           } else {
@@ -333,7 +461,9 @@ class _ShootingScreenState extends BasePageState<ShootingScreenListenState,
             second: shootingTime - 1,
           );
         }
-        appState.cameraUtils.shoot();
+        _stopLiveViewRecordingForCurrentShot();
+        final shootResult = await appState.cameraUtils.shoot();
+        logD('Canon shoot result=$shootResult');
       }
     } else {
       if (!isMockCameraMode && !(controller?.value.isRecordingVideo ?? false)) {
@@ -410,8 +540,13 @@ class _ShootingScreenState extends BasePageState<ShootingScreenListenState,
           }
 
           return ListenableBuilder(
-            listenable: _commonCounterController,
+            listenable: Listenable.merge([
+              _commonCounterController,
+              provider,
+            ]),
             builder: (context, _) {
+              final capturedPreviewPath =
+                  _lastCapturedImagePath ?? provider.latestPreviewImagePath;
               return _ShootingCanvas(
                 count: provider.uiImages.length,
                 total: shotCount,
@@ -446,13 +581,16 @@ class _ShootingScreenState extends BasePageState<ShootingScreenListenState,
                             Positioned.fill(
                               child: isMockCameraMode
                                   ? const _CameraPreviewPlaceholder()
-                                  : controller != null
-                                      ? Transform.flip(
-                                          flipY: true,
-                                          flipX: false,
-                                          child: CameraPreview(controller!),
-                                        )
-                                      : const _CameraPreviewPlaceholder(),
+                                      : controller != null
+                                          ? Transform.flip(
+                                              flipY: true,
+                                              flipX: false,
+                                              child: CameraPreview(controller!),
+                                            )
+                                          : _CanonCapturePreview(
+                                              imagePath: capturedPreviewPath,
+                                              textureId: _canonTextureId,
+                                            ),
                             ),
                             if (!isMockCameraMode && controller != null)
                               Positioned.fill(
@@ -460,6 +598,11 @@ class _ShootingScreenState extends BasePageState<ShootingScreenListenState,
                                   isVertical: isVertical,
                                 ),
                               ),
+                            _CapturedImageOverlay(
+                              imagePath: _canonTextureId == null
+                                  ? capturedPreviewPath
+                                  : null,
+                            ),
                             Positioned.fill(
                               child: ListenableBuilder(
                                 builder: (context, _) {
@@ -478,7 +621,10 @@ class _ShootingScreenState extends BasePageState<ShootingScreenListenState,
             },
           );
         },
-        listenable: _readyCounterController,
+        listenable: Listenable.merge([
+          _readyCounterController,
+          provider,
+        ]),
       ),
     );
   }
@@ -744,6 +890,182 @@ class _CameraPreviewPlaceholder extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _LiveViewShotRecorder {
+  _LiveViewShotRecorder({
+    required this.cameraUtils,
+    required this.ffmpegUtils,
+    required this.sessionId,
+    required this.shotIndex,
+    required this.logD,
+    required this.logE,
+  });
+
+  static const int _fps = 10;
+
+  final dynamic cameraUtils;
+  final FfmpegUtils ffmpegUtils;
+  final String sessionId;
+  final int shotIndex;
+  final void Function(String message) logD;
+  final void Function(Object error, StackTrace? stackTrace) logE;
+
+  Timer? _timer;
+  Directory? _frameDir;
+  int _frameIndex = 0;
+  bool _isCapturing = false;
+  bool _isStopped = false;
+
+  Future<void> start() async {
+    final parent = await DirectoryUtils.documentDirectory(
+      parentFolder: 'live_view_frames',
+    );
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final directory = Directory(
+      path.join(parent, '${sessionId}_shot_${shotIndex}_$timestamp'),
+    );
+    await directory.create(recursive: true);
+    _frameDir = directory;
+    _timer = Timer.periodic(
+      const Duration(milliseconds: 100),
+      (_) => unawaited(_captureFrame()),
+    );
+    await _captureFrame();
+    logD('LiveView recording start: shot=$shotIndex dir=${directory.path}');
+  }
+
+  Future<void> _captureFrame() async {
+    if (_isStopped || _isCapturing) {
+      return;
+    }
+    final directory = _frameDir;
+    if (directory == null) {
+      return;
+    }
+    _isCapturing = true;
+    try {
+      final bytes = await cameraUtils.downloadEvfBytes();
+      if (bytes.isEmpty) {
+        return;
+      }
+      _frameIndex++;
+      final framePath = path.join(
+        directory.path,
+        'frame_${_frameIndex.toString().padLeft(6, '0')}.jpg',
+      );
+      await File(framePath).writeAsBytes(bytes, flush: false);
+    } catch (error, stackTrace) {
+      logE(error, stackTrace);
+    } finally {
+      _isCapturing = false;
+    }
+  }
+
+  Future<File?> stopAndEncode() async {
+    _isStopped = true;
+    _timer?.cancel();
+    while (_isCapturing) {
+      await Future.delayed(const Duration(milliseconds: 20));
+    }
+    final directory = _frameDir;
+    if (directory == null || _frameIndex == 0) {
+      logD('LiveView recording skipped: shot=$shotIndex frames=$_frameIndex');
+      return null;
+    }
+    final framePattern = path.join(directory.path, 'frame_%06d.jpg');
+    logD('LiveView recording encode: shot=$shotIndex frames=$_frameIndex');
+    final encoded = await ffmpegUtils.encodeLiveViewFrames(
+      framePattern: framePattern,
+      fps: _fps,
+    );
+    logD('LiveView recording done: shot=$shotIndex video=${encoded?.path}');
+    return encoded;
+  }
+
+  void cancel() {
+    _isStopped = true;
+    _timer?.cancel();
+  }
+}
+
+class _CapturedImageOverlay extends StatelessWidget with LogMixin {
+  const _CapturedImageOverlay({required this.imagePath});
+
+  final String? imagePath;
+
+  @override
+  Widget build(BuildContext context) {
+    final value = imagePath;
+    if (value == null || value.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final file = File(value);
+    if (!file.existsSync()) {
+      return const SizedBox.shrink();
+    }
+
+    try {
+      final bytes = file.readAsBytesSync();
+      final modified = file.lastModifiedSync().microsecondsSinceEpoch;
+      return Positioned.fill(
+        child: Image.memory(
+          bytes,
+          key: ValueKey('captured:${file.path}:$modified'),
+          fit: BoxFit.cover,
+          gaplessPlayback: true,
+          errorBuilder: (context, error, stackTrace) {
+            logE(error, stackTrace: stackTrace);
+            return const SizedBox.shrink();
+          },
+        ),
+      );
+    } catch (error, stackTrace) {
+      logE(error, stackTrace: stackTrace);
+      return const SizedBox.shrink();
+    }
+  }
+}
+
+class _CanonCapturePreview extends StatelessWidget {
+  const _CanonCapturePreview({
+    required this.imagePath,
+    required this.textureId,
+  });
+
+  final String? imagePath;
+  final int? textureId;
+
+  @override
+  Widget build(BuildContext context) {
+    final valueTextureId = textureId;
+    if (valueTextureId != null && valueTextureId >= 0) {
+      return Stack(
+        fit: StackFit.expand,
+        children: [
+          const ColoredBox(color: Colors.black),
+          Texture(
+            textureId: valueTextureId,
+            filterQuality: FilterQuality.medium,
+          ),
+        ],
+      );
+    }
+
+    final value = imagePath;
+    if (value == null || value.isEmpty || !File(value).existsSync()) {
+      return const _CameraPreviewPlaceholder();
+    }
+    final file = File(value);
+    return Image.memory(
+      file.readAsBytesSync(),
+      key: ValueKey(
+          '${file.path}:${file.lastModifiedSync().microsecondsSinceEpoch}'),
+      fit: BoxFit.cover,
+      gaplessPlayback: true,
     );
   }
 }

@@ -46,6 +46,7 @@ class FFMpegCommand {
     commands.addAll(inputsList);
     commands.addAll(argsList);
     commands.addAll(filtersList);
+    commands.add('-y');
     commands.add(outputFilepath);
     return commands;
   }

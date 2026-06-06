@@ -56,7 +56,7 @@ target_compile_definitions(${PLUGIN_NAME} PRIVATE FLUTTER_PLUGIN_IMPL)
 #
 include_directories(${PLUGIN_NAME} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/edsdk/header")
 target_link_directories(${PLUGIN_NAME} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/edsdk/lib")
-target_link_libraries(${PLUGIN_NAME} PRIVATE "EDSDK.lib")
+target_link_libraries(${PLUGIN_NAME} PRIVATE "EDSDK.lib" windowscodecs ole32)
 
 # Source include directories and library dependencies. Add any plugin-specific
 # dependencies here.
@@ -68,9 +68,7 @@ target_link_libraries(${PLUGIN_NAME} PRIVATE flutter flutter_wrapper_plugin)
 # This list could contain prebuilt libraries, or libraries created by an
 # external build triggered from this build file.
 set(edsdk_bundled_libraries
-  ""
+  "${CMAKE_CURRENT_SOURCE_DIR}/edsdk/dll/EDSDK.dll"
+  "${CMAKE_CURRENT_SOURCE_DIR}/edsdk/dll/EdsImage.dll"
   PARENT_SCOPE
 )
-
-install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/edsdk/dll/EDSDK.dll" DESTINATION "${CMAKE_INSTALL_PREFIX}" COMPONENT Runtime)
-install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/edsdk/dll/EdsImage.dll" DESTINATION "${CMAKE_INSTALL_PREFIX}" COMPONENT Runtime)

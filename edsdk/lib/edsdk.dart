@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:edsdk/models/camera_model.dart';
 import 'package:edsdk/models/xfile.dart';
 import 'package:flutter/services.dart';
@@ -29,8 +31,24 @@ class Edsdk {
     return await EdsdkPlatform.instance.stopPreview();
   }
 
-  Future<String> downloadEvf() async {
-    return await EdsdkPlatform.instance.downloadEvf();
+  Future<String> downloadEvf({String? fileName}) async {
+    return await EdsdkPlatform.instance.downloadEvf(fileName: fileName);
+  }
+
+  Future<Uint8List> downloadEvfBytes() async {
+    return await EdsdkPlatform.instance.downloadEvfBytes();
+  }
+
+  Future<bool> downloadEvfTexture() async {
+    return await EdsdkPlatform.instance.downloadEvfTexture();
+  }
+
+  Future<bool> startRecord() async {
+    return await EdsdkPlatform.instance.startRecord();
+  }
+
+  Future<bool> stopRecord() async {
+    return await EdsdkPlatform.instance.stopRecord();
   }
 
   Future<bool> shoot() async {

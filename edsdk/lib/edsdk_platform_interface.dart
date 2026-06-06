@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:edsdk/models/camera_model.dart';
 import 'package:edsdk/models/xfile.dart';
 import 'package:flutter/services.dart';
@@ -50,8 +52,24 @@ abstract class EdsdkPlatform extends PlatformInterface {
     throw UnimplementedError('stopPreview() has not been implemented.');
   }
 
-  Future<String> downloadEvf() {
+  Future<String> downloadEvf({String? fileName}) {
     throw UnimplementedError('downloadEvf() has not been implemented.');
+  }
+
+  Future<Uint8List> downloadEvfBytes() {
+    throw UnimplementedError('downloadEvfBytes() has not been implemented.');
+  }
+
+  Future<bool> downloadEvfTexture() {
+    throw UnimplementedError('downloadEvfTexture() has not been implemented.');
+  }
+
+  Future<bool> startRecord() {
+    throw UnimplementedError('startRecord() has not been implemented.');
+  }
+
+  Future<bool> stopRecord() {
+    throw UnimplementedError('stopRecord() has not been implemented.');
   }
 
   Future<bool> shoot() {

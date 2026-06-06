@@ -21,6 +21,9 @@ class ShootingScreenProvider extends BaseProvider<ShootingScreenListenState> {
   List<String> tVideos = [];
   bool isLoading = false;
 
+  String? get latestPreviewImagePath =>
+      uiImages.lastOrNull ?? tImages.lastOrNull;
+
   int get shotCount {
     final value =
         appState.imageParam.selectedFrame.frameSetting?.numOfPhotos ?? 10;
@@ -28,6 +31,8 @@ class ShootingScreenProvider extends BaseProvider<ShootingScreenListenState> {
   }
 
   void saveImage({required String imagePath}) {
+    logD(
+        'Shooting saveImage: path=$imagePath exists=${File(imagePath).existsSync()}');
     uiImages.add(imagePath);
     unawaited(
       appState.sendEvent(
@@ -46,8 +51,13 @@ class ShootingScreenProvider extends BaseProvider<ShootingScreenListenState> {
         width: size.$1,
         height: size.$2,
         onComplete: (image) {
-          if (image == null) return;
+          if (image == null) {
+            logE('Shooting preprocess image failed: $imagePath');
+            return;
+          }
+          logD('Shooting preprocess image done: ${image.path}');
           tImages.add(image.path);
+          notifyListeners();
         });
   }
 
@@ -59,7 +69,11 @@ class ShootingScreenProvider extends BaseProvider<ShootingScreenListenState> {
         width: size.$1,
         height: size.$2,
         onComplete: (video) {
-          if (video == null) return;
+          if (video == null) {
+            logE('Shooting preprocess video failed: $videoPath');
+            return;
+          }
+          logD('Shooting preprocess video done: ${video.path}');
           tVideos.add(video.path);
         },
         second: second);
@@ -126,21 +140,29 @@ class ShootingScreenProvider extends BaseProvider<ShootingScreenListenState> {
         tVideos.length != shotCount ||
         tVideos.length != tImages.length) {
       if (DateTime.now().isAfter(timeout)) {
-        final fallbackPath = uiImages.isNotEmpty ? uiImages.last : "";
         while (tImages.length < shotCount) {
-          tImages.add(fallbackPath);
+          final index = tImages.length;
+          final fallbackPath =
+              index < uiImages.length ? uiImages[index] : uiImages.lastOrNull;
+          tImages.add(fallbackPath ?? "");
         }
         while (tVideos.length < shotCount) {
-          tVideos.add(fallbackPath);
+          final index = tVideos.length;
+          final fallbackPath =
+              index < uiImages.length ? uiImages[index] : uiImages.lastOrNull;
+          tVideos.add(fallbackPath ?? "");
         }
         break;
       }
       await Future.delayed(Duration(seconds: 1));
     }
 
-    for (int i = 0; i < tImages.length; i++) {
-      realDataFiles[tImages[i]] = tVideos[i];
+    final orderedImages = [...tImages]..sort();
+    final orderedVideos = [...tVideos]..sort();
+    for (int i = 0; i < orderedImages.length; i++) {
+      realDataFiles[orderedImages[i]] = orderedVideos[i];
     }
+    logD('Shooting onNext files: ${realDataFiles.keys.toList()}');
 
     streamController.sink.add(ShootingScreenSuccessState());
     unawaited(

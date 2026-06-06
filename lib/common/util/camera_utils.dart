@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:edsdk/edsdk.dart';
 import 'package:edsdk/models/camera_model.dart';
 import 'package:edsdk/models/xfile.dart';
@@ -63,12 +65,48 @@ class CameraUtils with LogMixin {
     }
   }
 
-  Future<String> downloadEvf() async {
+  Future<String> downloadEvf({String? fileName}) async {
     try {
-      return await _edsdk.downloadEvf();
+      return await _edsdk.downloadEvf(fileName: fileName);
     } on MissingPluginException catch (error) {
       logE(error);
       return "";
+    }
+  }
+
+  Future<Uint8List> downloadEvfBytes() async {
+    try {
+      return await _edsdk.downloadEvfBytes();
+    } on MissingPluginException catch (error) {
+      logE(error);
+      return Uint8List(0);
+    }
+  }
+
+  Future<bool> downloadEvfTexture() async {
+    try {
+      return await _edsdk.downloadEvfTexture();
+    } on MissingPluginException catch (error) {
+      logE(error);
+      return false;
+    }
+  }
+
+  Future<bool> startRecord() async {
+    try {
+      return await _edsdk.startRecord();
+    } on MissingPluginException catch (error) {
+      logE(error);
+      return false;
+    }
+  }
+
+  Future<bool> stopRecord() async {
+    try {
+      return await _edsdk.stopRecord();
+    } on MissingPluginException catch (error) {
+      logE(error);
+      return false;
     }
   }
 
