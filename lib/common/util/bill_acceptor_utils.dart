@@ -143,11 +143,11 @@ class BillAcceptorUtils with LogMixin {
   }
 
   bool disable() {
-    return _send(command: BillAcceptorCommand.reset);
+    return _send(command: BillAcceptorCommand.disableBillAcceptor);
   }
 
   bool enable() {
-    return _send(command: BillAcceptorCommand.start);
+    return _send(command: BillAcceptorCommand.enableBillAcceptor);
   }
 
   bool accept() {

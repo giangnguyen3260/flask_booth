@@ -1,11 +1,14 @@
+import 'dart:io';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:project_l/common/enums/orientation_enum.dart';
 import 'package:project_l/common/constants/device_constants.dart';
 import 'package:project_l/common/log/log_utils.dart';
 import 'package:project_l/common/navigator/app_router.dart';
 import 'package:project_l/common/provider/app_state.dart';
+import 'package:project_l/common/util/printer_utils.dart';
 import 'package:project_l/config/injetable_config.dart';
 import 'package:project_l/common/models/app_theme_config.dart';
 import 'package:project_l/resources/app_theme_data.dart';
@@ -43,14 +46,45 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   final AppState appState = getIt.get<AppState>();
+  bool _didRunPrintDiagnostic = false;
 
   @override
   void initState() {
     appState.init();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       appState.cameraUtils.initSdk();
+      _runPrintDiagnosticIfRequested();
     });
     super.initState();
+  }
+
+  Future<void> _runPrintDiagnosticIfRequested() async {
+    if (_didRunPrintDiagnostic) {
+      return;
+    }
+    final printFilePath = Platform.environment['PTB_TEST_PRINT_FILE']?.trim();
+    if (printFilePath == null || printFilePath.isEmpty) {
+      return;
+    }
+    _didRunPrintDiagnostic = true;
+    final file = File(printFilePath);
+    LogUtils.d('Print diagnostic start: ${file.path}');
+    try {
+      final success = await getIt
+          .get<PrinterUtils>()
+          .printImage(
+            file: file,
+            numCut: 1,
+            orientation: OrientationEnum.portrait,
+          )
+          .timeout(
+            const Duration(seconds: 60),
+            onTimeout: () => false,
+          );
+      LogUtils.d('Print diagnostic done: success=$success');
+    } catch (error, stackTrace) {
+      LogUtils.e(error, stackTrace: stackTrace);
+    }
   }
 
   @override
@@ -94,10 +128,10 @@ class _MyAppState extends State<MyApp> {
                   locale: value,
                   supportedLocales: S.delegate.supportedLocales,
                   routerConfig: getIt.get<AppRouter>().config(
-                    navigatorObservers: () => [
-                      getIt.get<AppRouteObserver>(),
-                    ],
-                  ),
+                        navigatorObservers: () => [
+                          getIt.get<AppRouteObserver>(),
+                        ],
+                      ),
                 ),
               );
             },

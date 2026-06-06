@@ -17,6 +17,7 @@ import 'package:project_l/gen/assets.gen.dart';
 import 'package:project_l/resources/flashy_booth_theme.dart';
 import 'package:provider/provider.dart';
 import 'package:video_player/video_player.dart';
+import 'package:window_manager/window_manager.dart';
 
 @RoutePage()
 class PrintingScreen extends StatefulWidget {
@@ -183,6 +184,11 @@ class _PrintingScreenState extends BasePageState<PrintingScreenListenState,
               top: 36.h,
               right: 72.w,
               child: const FlashyBoothLanguagePill(),
+            ),
+            Positioned(
+              top: 36.h,
+              right: 204.w,
+              child: _buildCloseAppButton(),
             ),
             Padding(
               padding: EdgeInsets.fromLTRB(
@@ -665,6 +671,31 @@ class _PrintingScreenState extends BasePageState<PrintingScreenListenState,
                   size: 28.r,
                 ),
               ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCloseAppButton() {
+    return Tooltip(
+      message: 'Close app',
+      child: SizedBox(
+        width: 58.w,
+        height: 58.w,
+        child: Material(
+          color: Colors.white.withValues(alpha: 0.65),
+          shape: const CircleBorder(),
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: windowManager.close,
+            child: Center(
+              child: Icon(
+                Icons.power_settings_new_rounded,
+                color: FlashyBoothColors.pink,
+                size: 27.r,
+              ),
             ),
           ),
         ),

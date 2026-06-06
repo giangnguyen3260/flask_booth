@@ -34,6 +34,7 @@ class AppState extends ChangeNotifier with LogMixin {
       'assets/dummy/local_main_info.json';
   static const int _maxAdminDataBackups = 10;
   static const String _adminDataBackupFolder = 'admin_data_backups';
+  static const String _adminDataCurrentFile = 'admin_data_current.json';
   static const String _uploadQueueFolder = 'upload_queue';
   static const Duration adminUpdateCheckInterval = Duration(minutes: 5);
 
@@ -206,14 +207,14 @@ class AppState extends ChangeNotifier with LogMixin {
     try {
       remoteData = await restClient.initData();
       final preparedData = await _prepareAppData(remoteData);
-      await _saveAdminDataBackup(preparedData);
+      await _saveAdminDataLocal(preparedData);
       await _applyPreparedAppData(preparedData);
     } catch (error, stackTrace) {
       logE(error, stackTrace: stackTrace);
-      final backupData = await _loadLatestAdminDataBackup();
-      if (backupData != null) {
-        logD('Loading latest admin data backup');
-        await _applyPreparedAppData(backupData);
+      final localData = await _loadLocalAdminData();
+      if (localData != null) {
+        logD('Loading local admin data cache');
+        await _applyPreparedAppData(localData);
         return;
       }
       logD('Loading fallback app data from $_fallbackAppDataAsset');
@@ -375,7 +376,7 @@ class AppState extends ChangeNotifier with LogMixin {
     try {
       final remoteData = await restClient.initData();
       final preparedData = await _prepareAppData(remoteData);
-      await _saveAdminDataBackup(preparedData);
+      await _saveAdminDataLocal(preparedData);
       await _applyPreparedAppData(preparedData);
       latestAdminDataVersion = activeAdminDataVersion;
       hasPendingAdminUpdate = false;
@@ -432,6 +433,7 @@ class AppState extends ChangeNotifier with LogMixin {
     required double amount,
     required int printQuantity,
     String? cuKey,
+    bool uploadNow = true,
   }) async {
     final durableImagePath = await _copyUploadFile(
       saleNo: saleNo,
@@ -443,11 +445,26 @@ class AppState extends ChangeNotifier with LogMixin {
         await _copyUploadFile(saleNo: saleNo, sourcePath: videoPath),
       );
     }
+    final imageBytes = _fileLength(durableImagePath);
+    final videoBytes = durableVideoPaths.fold<int>(
+      0,
+      (total, videoPath) => total + _fileLength(videoPath),
+    );
+    final totalUploadBytes = imageBytes + videoBytes;
+    logD(
+      'Upload payload prepared: saleNo=$saleNo imgCount=1 '
+      'videoCount=${durableVideoPaths.length} '
+      'image=${_formatBytes(imageBytes)} video=${_formatBytes(videoBytes)} '
+      'total=${_formatBytes(totalUploadBytes)}',
+    );
     final job = <String, Object?>{
       'saleNo': saleNo,
       'frameId': frameId,
       'imagePath': durableImagePath,
       'videoPaths': durableVideoPaths,
+      'imageBytes': imageBytes,
+      'videoBytes': videoBytes,
+      'totalUploadBytes': totalUploadBytes,
       'cuKey': cuKey,
       'amount': amount,
       'printQuantity': printQuantity,
@@ -456,10 +473,30 @@ class AppState extends ChangeNotifier with LogMixin {
       'updatedAt': DateTime.now().toUtc().toIso8601String(),
     };
 
+    await _upsertUploadJob(job);
+    if (!uploadNow) {
+      logD(
+        'Upload queued for later: saleNo=$saleNo '
+        'total=${_formatBytes(totalUploadBytes)}',
+      );
+      return null;
+    }
     try {
-      return await _submitUploadJob(job);
+      job['status'] = 'uploading';
+      job['updatedAt'] = DateTime.now().toUtc().toIso8601String();
+      await _upsertUploadJob(job);
+      final response = await _submitUploadJob(job).timeout(
+        const Duration(seconds: 25),
+      );
+      job['status'] = 'uploaded';
+      job['qrUrl'] = response.qrUrl;
+      job['updatedAt'] = DateTime.now().toUtc().toIso8601String();
+      await _upsertUploadJob(job);
+      return response;
     } catch (error, stackTrace) {
       logE(error, stackTrace: stackTrace);
+      job['status'] = 'failed_retryable';
+      job['updatedAt'] = DateTime.now().toUtc().toIso8601String();
       await _upsertUploadJob(job);
       return null;
     }
@@ -783,6 +820,23 @@ class AppState extends ChangeNotifier with LogMixin {
     return sanitized.isEmpty ? 'unknown' : sanitized;
   }
 
+  Future<void> _saveAdminDataLocal(AppData preparedData) async {
+    await _replaceCurrentAdminData(preparedData);
+    await _saveAdminDataBackup(preparedData);
+  }
+
+  Future<void> _replaceCurrentAdminData(AppData preparedData) async {
+    final directory = await _appDocumentSubDirectory(_adminDataBackupFolder);
+    final file = File(path.join(directory.path, _adminDataCurrentFile));
+    final tempFile = File('${file.path}.tmp');
+    await tempFile.writeAsString(jsonEncode(preparedData.toJson()),
+        flush: true);
+    if (file.existsSync()) {
+      await file.delete();
+    }
+    await tempFile.rename(file.path);
+  }
+
   Future<void> _saveAdminDataBackup(AppData preparedData) async {
     final backupDirectory =
         await _appDocumentSubDirectory(_adminDataBackupFolder);
@@ -799,7 +853,9 @@ class AppState extends ChangeNotifier with LogMixin {
     final files = backupDirectory
         .listSync()
         .whereType<File>()
-        .where((file) => file.path.toLowerCase().endsWith('.json'))
+        .where((file) =>
+            file.path.toLowerCase().endsWith('.json') &&
+            path.basename(file.path) != _adminDataCurrentFile)
         .toList()
       ..sort((a, b) => b.lastModifiedSync().compareTo(a.lastModifiedSync()));
     for (var index = _maxAdminDataBackups; index < files.length; index++) {
@@ -811,13 +867,40 @@ class AppState extends ChangeNotifier with LogMixin {
     }
   }
 
+  Future<AppData?> _loadLocalAdminData() async {
+    final currentData = await _loadCurrentAdminData();
+    if (currentData != null) {
+      return currentData;
+    }
+    return _loadLatestAdminDataBackup();
+  }
+
+  Future<AppData?> _loadCurrentAdminData() async {
+    final directory = await _appDocumentSubDirectory(_adminDataBackupFolder);
+    final file = File(path.join(directory.path, _adminDataCurrentFile));
+    if (!file.existsSync()) {
+      return null;
+    }
+    try {
+      final jsonMap = jsonDecode(await file.readAsString());
+      if (jsonMap is Map<String, dynamic>) {
+        return AppData.fromJson(jsonMap);
+      }
+    } catch (error, stackTrace) {
+      logE(error, stackTrace: stackTrace);
+    }
+    return null;
+  }
+
   Future<AppData?> _loadLatestAdminDataBackup() async {
     final backupDirectory =
         await _appDocumentSubDirectory(_adminDataBackupFolder);
     final files = backupDirectory
         .listSync()
         .whereType<File>()
-        .where((file) => file.path.toLowerCase().endsWith('.json'))
+        .where((file) =>
+            file.path.toLowerCase().endsWith('.json') &&
+            path.basename(file.path) != _adminDataCurrentFile)
         .toList()
       ..sort((a, b) => b.lastModifiedSync().compareTo(a.lastModifiedSync()));
     for (final file in files) {
@@ -855,6 +938,35 @@ class AppState extends ChangeNotifier with LogMixin {
     }
     await source.copy(target.path);
     return target.path;
+  }
+
+  int _fileLength(String filePath) {
+    final file = File(filePath);
+    if (!file.existsSync()) {
+      return 0;
+    }
+    try {
+      return file.lengthSync();
+    } catch (error, stackTrace) {
+      logE(error, stackTrace: stackTrace);
+      return 0;
+    }
+  }
+
+  String _formatBytes(int bytes) {
+    if (bytes < 1024) {
+      return '$bytes B';
+    }
+    final kb = bytes / 1024;
+    if (kb < 1024) {
+      return '${kb.toStringAsFixed(1)} KB';
+    }
+    final mb = kb / 1024;
+    if (mb < 1024) {
+      return '${mb.toStringAsFixed(2)} MB';
+    }
+    final gb = mb / 1024;
+    return '${gb.toStringAsFixed(2)} GB';
   }
 
   Future<File> _uploadJobsFile() async {
@@ -912,6 +1024,18 @@ class AppState extends ChangeNotifier with LogMixin {
         videoFiles.add(await MultipartFile.fromFile(videoPath));
       }
     }
+    final imageBytes = _fileLength(imagePath);
+    final videoBytes = videoPaths.fold<int>(
+      0,
+      (total, videoPath) => total + _fileLength(videoPath),
+    );
+    final totalUploadBytes = imageBytes + videoBytes;
+    logD(
+      'Upload payload submit: saleNo=${job['saleNo']} imgCount=1 '
+      'videoCount=${videoFiles.length}/${videoPaths.length} '
+      'image=${_formatBytes(imageBytes)} video=${_formatBytes(videoBytes)} '
+      'total=${_formatBytes(totalUploadBytes)}',
+    );
     return restClient.submit(
       saleNo: (job['saleNo'] ?? '').toString(),
       cuKey: job['cuKey']?.toString(),

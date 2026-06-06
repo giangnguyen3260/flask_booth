@@ -20,10 +20,7 @@ class PrinterUtils {
   late final String _twoInchCutPath = Assets.files.a2inchCut;
   late final String _normalCutPath = Assets.files.normalCut;
   final MethodChannel _printerMethodChannel =
-  MethodChannel(PrinterMethodChannelConstants.methodChannelName);
-
-
-
+      MethodChannel(PrinterMethodChannelConstants.methodChannelName);
 
   Future<bool> printImage({
     required File file,
@@ -32,9 +29,14 @@ class PrinterUtils {
     required OrientationEnum orientation,
   }) async {
     print('PrinterUtils.printImage file=${file.path} copies=$numCut');
+    if (!file.existsSync()) {
+      print('PrinterUtils.printImage missing file=${file.path}');
+      return false;
+    }
+    final copies = numCut < 1 ? 1 : numCut;
     final doc = pw.Document();
 
-    Uint8List bytes = file.readAsBytesSync();
+    Uint8List bytes = await file.readAsBytes();
 
     doc.addPage(
       pw.Page(
@@ -51,29 +53,53 @@ class PrinterUtils {
         },
       ),
     );
-    final printers = await Printing.listPrinters();
-    print('PrinterUtils.availablePrinters=${printers.map((e) => e.name).join(', ')}');
-    Printer printer = printers.lastWhere(
-      (e) => e.name.contains(PrinterConstants.printerName),
+    final pdfBytes = await doc.save();
+    final printers = await Printing.listPrinters().timeout(
+      const Duration(seconds: 8),
     );
+    print(
+      'PrinterUtils.availablePrinters=${printers.map((e) => e.name).join(', ')}',
+    );
+    final matches =
+        printers.where((e) => e.name.contains(PrinterConstants.printerName));
+    if (matches.isEmpty) {
+      print('PrinterUtils.selectedPrinter not found');
+      return false;
+    }
+    final printer = matches.last;
     print('PrinterUtils.selectedPrinter=${printer.name}');
 
-    for (int i = 0; i < numCut; i++) {
-      print('PrinterUtils.directPrintPdf copy=${i + 1}/$numCut');
-      await Printing.directPrintPdf(
+    for (int i = 0; i < copies; i++) {
+      print('PrinterUtils.directPrintPdf copy=${i + 1}/$copies');
+      await Future.value(Printing.directPrintPdf(
         format: format,
-        usePrinterSettings: true,
-        onLayout: (PdfPageFormat format) async => doc.save(),
+        usePrinterSettings: false,
+        onLayout: (PdfPageFormat format) async => pdfBytes,
         printer: printer,
+      )).timeout(
+        const Duration(seconds: 20),
       );
     }
 
-    while ((await getJobQueue()).isNotEmpty) {
-      await Future.delayed(
-        const Duration(milliseconds: 1500),
-      );
-    }
+    await _waitForPrinterQueue(maxAttempts: 8);
     return true;
+  }
+
+  Future<void> _waitForPrinterQueue({required int maxAttempts}) async {
+    for (var attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        final jobs = await getJobQueue().timeout(const Duration(seconds: 3));
+        print('PrinterUtils.queue attempt=${attempt + 1} jobs=${jobs.length}');
+        if (jobs.isEmpty) {
+          return;
+        }
+      } catch (error) {
+        print('PrinterUtils.queue check failed: $error');
+        return;
+      }
+      await Future.delayed(const Duration(milliseconds: 1500));
+    }
+    print('PrinterUtils.queue wait timeout');
   }
 
   /*
@@ -97,8 +123,8 @@ class PrinterUtils {
     }
     print("$cmd u");
     return await _printerMethodChannel.invokeMethod<bool>("change_mode", {
-      "command": "$cmd u",
-    }) ??
+          "command": "$cmd u",
+        }) ??
         false;
   }
 
@@ -132,7 +158,7 @@ class PrinterUtils {
 
     for (int i = 0; i < data.length; i++) {
       PrinterJob printerJob =
-      PrinterJob.fromJson((data[i] as Map).cast<String, dynamic>());
+          PrinterJob.fromJson((data[i] as Map).cast<String, dynamic>());
       jobs.add(printerJob);
     }
 

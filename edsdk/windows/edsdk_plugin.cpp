@@ -30,7 +30,7 @@ namespace edsdk {
         }
     }
 
-    bool DecodeJpegToBgra(const std::vector<uint8_t> &jpeg,
+    bool DecodeJpegToRgba(const std::vector<uint8_t> &jpeg,
                           std::vector<uint8_t> &pixels,
                           UINT &width,
                           UINT &height) {
@@ -82,7 +82,7 @@ namespace edsdk {
         if (SUCCEEDED(hr)) {
             hr = converter->Initialize(
                     frame,
-                    GUID_WICPixelFormat32bppPBGRA,
+                    GUID_WICPixelFormat32bppRGBA,
                     WICBitmapDitherTypeNone,
                     nullptr,
                     0.0,
@@ -291,7 +291,7 @@ void EdsdkPlugin::HandleMethodCall(
         UINT width = 0;
         UINT height = 0;
         std::vector<uint8_t> decodedPixels;
-        if (!DecodeJpegToBgra(jpeg, decodedPixels, width, height)) {
+        if (!DecodeJpegToRgba(jpeg, decodedPixels, width, height)) {
             result->Success(flutter::EncodableValue(false));
             return;
         }

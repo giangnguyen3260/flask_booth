@@ -80,7 +80,7 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
         finalPrintImagePath = mockImage;
         uploadImage = mockImage;
         final mockVideoPaths = _resolveMockVideoPaths();
-        preparationStatus = 'Uploading result...';
+        preparationStatus = 'Saving upload for later...';
         notifyListeners();
         logD(
           'Printing mock export image: $mockImage videos=${mockVideoPaths.length}',
@@ -92,7 +92,8 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
             imagePath: uploadImage,
             videoPaths: mockVideoPaths,
             amount: appState.imageParam.selectedFrame.price ?? 0,
-            printQuantity: appState.imageParam.printQuantity);
+            printQuantity: appState.imageParam.printQuantity,
+            uploadNow: false);
 
         qrUrl = response?.qrUrl ?? '';
         isUploadQueued = response == null;
@@ -143,11 +144,8 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
             params: appState.imageParam.pansAndScales,
             flip: appState.imageParam.isFlipped);
         logD('Printing merge upload image done: $uploadImage');
-        preparationStatus = 'Preparing cut print image...';
-        notifyListeners();
-        printingImage =
-            await _ffmpegUtils.mergeHorizontalImage(imagePath: uploadImage);
-        logD('Printing merge horizontal image done: $printingImage');
+        printingImage = uploadImage;
+        logD('Printing cut print image uses upload image: $printingImage');
       } else {
         preparationStatus = 'Preparing printer cut mode...';
         notifyListeners();
@@ -169,18 +167,7 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
       }
 
       finalPrintImagePath = printingImage;
-      preparationStatus = 'Sending print job...';
       notifyListeners();
-
-      var size = appState.imageParam.selectedFrame.getSize();
-      logD('Printing print job start: $printingImage');
-      await _printerUtils.printImage(
-          file: File(printingImage),
-          numCut: isCut
-              ? (appState.imageParam.printQuantity / 2).toInt()
-              : appState.imageParam.printQuantity,
-          orientation: Size(size.$1, size.$2).orientation);
-      logD('Printing print job queued');
 
       final videoPaths = <String>[];
       if (appState.imageParam.videos.isNotEmpty) {
@@ -198,9 +185,9 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
         logD('Printing merge video done: $mergedVideo');
       }
 
-      preparationStatus = 'Uploading result...';
+      preparationStatus = 'Saving upload for later...';
       notifyListeners();
-      logD('Printing submit/upload start');
+      logD('Printing queue upload start');
       final response = await appState.submitOrQueueResult(
           saleNo: appState.imageParam.session,
           cuKey: appState.imageParam.couponCode,
@@ -208,7 +195,8 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
           imagePath: uploadImage,
           videoPaths: videoPaths,
           amount: appState.imageParam.selectedFrame.price ?? 0,
-          printQuantity: appState.imageParam.printQuantity);
+          printQuantity: appState.imageParam.printQuantity,
+          uploadNow: false);
 
       qrUrl = response?.qrUrl ?? '';
       isUploadQueued = response == null;
@@ -222,8 +210,33 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
       }
       preparationStatus = isUploadQueued ? 'Waiting to upload when online' : '';
       logD(
-        'Printing export done: queued=$isUploadQueued qrUrl=${qrUrl.isNotEmpty}',
+        'Printing queue upload done: queued=$isUploadQueued qrUrl=${qrUrl.isNotEmpty}',
       );
+      notifyListeners();
+
+      try {
+        preparationStatus = 'Sending print job...';
+        notifyListeners();
+        var size = appState.imageParam.selectedFrame.getSize();
+        final printCopies = _resolvePrintCopies(isCut: isCut);
+        logD('Printing print job start: $printingImage');
+        final printQueued = await _printerUtils
+            .printImage(
+              file: File(printingImage),
+              numCut: printCopies,
+              orientation: Size(size.$1, size.$2).orientation,
+            )
+            .timeout(
+              const Duration(seconds: 45),
+              onTimeout: () => false,
+            );
+        logD(
+          'Printing print job done: queued=$printQueued copies=$printCopies',
+        );
+      } catch (error, stackTrace) {
+        logE(error, stackTrace: stackTrace);
+      }
+      preparationStatus = isUploadQueued ? 'Waiting to upload when online' : '';
       notifyListeners();
     } catch (error, stackTrace) {
       preparationStatus = 'Could not prepare print image';
@@ -270,5 +283,11 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
     return appState.imageParam.videos
         .where((path) => path.isNotEmpty && File(path).existsSync())
         .toList();
+  }
+
+  int _resolvePrintCopies({required bool isCut}) {
+    final quantity = appState.imageParam.printQuantity;
+    final copies = isCut ? (quantity / 2).ceil() : quantity;
+    return copies < 1 ? 1 : copies;
   }
 }

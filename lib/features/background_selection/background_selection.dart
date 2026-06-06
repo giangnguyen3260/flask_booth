@@ -465,8 +465,10 @@ class _BackgroundSelectionScreenState extends BasePageState<
                 Positioned.fill(
                   child: Image.file(
                     File(frameOverlayPath),
+                    key: ValueKey(frameOverlayPath),
                     fit: BoxFit.contain,
                     filterQuality: FilterQuality.high,
+                    gaplessPlayback: true,
                   ),
                 ),
               ],
@@ -496,8 +498,10 @@ class _BackgroundSelectionScreenState extends BasePageState<
           clipper: _TransparentHolesClipper(holeRects: holeRects),
           child: Image.file(
             File(sceneBackgroundPath),
+            key: ValueKey(sceneBackgroundPath),
             fit: BoxFit.contain,
             filterQuality: FilterQuality.high,
+            gaplessPlayback: true,
           ),
         );
       },
@@ -615,7 +619,7 @@ class _BackgroundSelectionScreenState extends BasePageState<
             child: GridView.builder(
               padding: EdgeInsets.zero,
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: backgrounds.length <= 2 ? 1 : 2,
+                crossAxisCount: 2,
                 mainAxisSpacing: 18.h,
                 crossAxisSpacing: 16.w,
                 childAspectRatio: 0.72,
@@ -1089,8 +1093,10 @@ class _BackgroundTile extends StatelessWidget {
                 child: path.isNotEmpty && File(path).existsSync()
                     ? Image.file(
                         File(path),
+                        key: ValueKey(path),
                         fit: BoxFit.cover,
                         filterQuality: FilterQuality.high,
+                        gaplessPlayback: true,
                       )
                     : const SizedBox.shrink(),
               ),

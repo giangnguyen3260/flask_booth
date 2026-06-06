@@ -417,7 +417,8 @@ class _ShootingScreenState extends BasePageState<ShootingScreenListenState,
         await provider.saveMockCapture(imagePath: imagePath);
         if (mounted) {
           setState(() {
-            _lastCapturedImagePath = provider.latestPreviewImagePath ?? imagePath;
+            _lastCapturedImagePath =
+                provider.latestPreviewImagePath ?? imagePath;
           });
         }
         _shutter.value = true;
@@ -581,6 +582,11 @@ class _ShootingScreenState extends BasePageState<ShootingScreenListenState,
                             Positioned.fill(
                               child: isMockCameraMode
                                   ? const _CameraPreviewPlaceholder()
+                                  : _canonTextureId != null
+                                      ? _CanonCapturePreview(
+                                          imagePath: capturedPreviewPath,
+                                          textureId: _canonTextureId,
+                                        )
                                       : controller != null
                                           ? Transform.flip(
                                               flipY: true,
@@ -823,22 +829,6 @@ class _CameraPreviewFrame extends StatelessWidget {
       child: Stack(
         children: [
           Positioned.fill(child: child),
-          Positioned.fill(
-            child: IgnorePointer(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      const Color(0xFF29304D).withValues(alpha: 0.42),
-                      const Color(0xFF0C4D82).withValues(alpha: 0.28),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
           Positioned.fill(
             child: IgnorePointer(
               child: CustomPaint(painter: _CameraCornerPainter()),
