@@ -136,7 +136,11 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
         preparationStatus = 'Preparing printer cut mode...';
         notifyListeners();
         logD('Printing change cut mode: twoInch');
-        await _printerUtils.changeCutMode(PrinterCutMode.twoInch);
+        final cutModeChanged =
+            await _printerUtils.changeCutMode(PrinterCutMode.twoInch);
+        if (!cutModeChanged) {
+          logE('Printing change cut mode failed: twoInch');
+        }
 
         preparationStatus = 'Merging print image...';
         notifyListeners();
@@ -155,7 +159,11 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
         preparationStatus = 'Preparing printer cut mode...';
         notifyListeners();
         logD('Printing change cut mode: standard');
-        await _printerUtils.changeCutMode(PrinterCutMode.standard);
+        final cutModeChanged =
+            await _printerUtils.changeCutMode(PrinterCutMode.standard);
+        if (!cutModeChanged) {
+          logE('Printing change cut mode failed: standard');
+        }
 
         preparationStatus = 'Merging print image...';
         notifyListeners();

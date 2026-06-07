@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 
@@ -63,7 +63,7 @@ class _BackgroundSelectionScreenState extends BasePageState<
       ? _backgroundInfo
       : [
           BackgroundInfo(
-            bgCateNm: 'Mặc định',
+            bgCateNm: 'M\u1eb7c \u0111\u1ecbnh',
             bgCateIcon: appState.imageParam.selectedFrame.frameUrlTempDis ??
                 appState.imageParam.selectedFrame.frameUrl,
             background: [
@@ -283,19 +283,19 @@ class _BackgroundSelectionScreenState extends BasePageState<
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           FlashyBoothScreenTitle(
-            title: flashyBoothText(context, vi: 'Chỉnh ảnh', en: 'Edit Photo'),
+            title: flashyBoothText(context, vi: 'Ch\u1ec9nh \u1ea3nh', en: 'Edit Photo'),
             subtitle: flashyBoothSecondaryText(
               context,
-              vi: 'Chỉnh ảnh',
+              vi: 'Ch\u1ec9nh \u1ea3nh',
               en: 'Edit Photo',
             ),
           ),
           28.verticalSpace,
           _EditToolButton(
-            title: flashyBoothText(context, vi: 'Gốc', en: 'Original'),
+            title: flashyBoothText(context, vi: 'G\u1ed1c', en: 'Original'),
             subtitle: flashyBoothSecondaryText(
               context,
-              vi: 'Gốc',
+              vi: 'G\u1ed1c',
               en: 'Original',
             ),
             selected: provider.currentFilterIndex < 0 &&
@@ -310,11 +310,119 @@ class _BackgroundSelectionScreenState extends BasePageState<
             },
           ),
           18.verticalSpace,
-          _EditToolButton(
-            title: flashyBoothText(context, vi: 'Độ sáng', en: 'Brightness'),
+          _buildAdjustmentTool(
+            title: flashyBoothText(
+              context,
+              vi: 'T\u01b0\u01a1ng ph\u1ea3n',
+              en: 'Contrast',
+            ),
             subtitle: flashyBoothSecondaryText(
               context,
-              vi: 'Độ sáng',
+              vi: 'T\u01b0\u01a1ng ph\u1ea3n',
+              en: 'Contrast',
+            ),
+            label: flashyBoothText(
+              context,
+              vi: 'M\u1ee9c t\u01b0\u01a1ng ph\u1ea3n',
+              en: 'Contrast level',
+            ),
+            activeType: FilterEnum.contrast,
+            value: FilterEnum.contrast.toUIValue(provider.effect.contrast),
+            min: -100,
+            max: 100,
+            divisions: 200,
+            onChanged: (value) {
+              provider.changeEffect(
+                FilterEnum.contrast.fromUIValue(value),
+                FilterEnum.contrast,
+              );
+            },
+            onReset: () {
+              provider.changeEffect(
+                FilterEnum.contrast.getDefaultValue(),
+                FilterEnum.contrast,
+              );
+            },
+          ),
+          18.verticalSpace,
+          _buildAdjustmentTool(
+            title: flashyBoothText(
+              context,
+              vi: 'M\u00e0u s\u1eafc',
+              en: 'Color',
+            ),
+            subtitle: flashyBoothSecondaryText(
+              context,
+              vi: 'M\u00e0u s\u1eafc',
+              en: 'Saturation',
+            ),
+            label: flashyBoothText(
+              context,
+              vi: '\u0110\u1ed9 \u0111\u1eadm m\u00e0u',
+              en: 'Color level',
+            ),
+            activeType: FilterEnum.vibrance,
+            value: FilterEnum.saturation.toUIValue(provider.effect.saturation),
+            min: -100,
+            max: 100,
+            divisions: 200,
+            onChanged: (value) {
+              provider.changeEffect(
+                FilterEnum.saturation.fromUIValue(value),
+                FilterEnum.saturation,
+              );
+            },
+            onReset: () {
+              provider.changeEffect(
+                FilterEnum.saturation.getDefaultValue(),
+                FilterEnum.saturation,
+              );
+            },
+          ),
+          18.verticalSpace,
+          _buildAdjustmentTool(
+            title: flashyBoothText(
+              context,
+              vi: '\u1ea4m/l\u1ea1nh',
+              en: 'Warm/Cool',
+            ),
+            subtitle: flashyBoothSecondaryText(
+              context,
+              vi: '\u1ea4m/l\u1ea1nh',
+              en: 'Temperature',
+            ),
+            label: flashyBoothText(
+              context,
+              vi: 'Nhi\u1ec7t \u0111\u1ed9 m\u00e0u',
+              en: 'Warm / cool',
+            ),
+            activeType: FilterEnum.temperature,
+            value:
+                FilterEnum.temperature.toUIValue(provider.effect.temperature),
+            min: -100,
+            max: 100,
+            divisions: 200,
+            onChanged: (value) {
+              provider.changeEffect(
+                FilterEnum.temperature.fromUIValue(value),
+                FilterEnum.temperature,
+              );
+            },
+            onReset: () {
+              provider.changeEffect(
+                FilterEnum.temperature.getDefaultValue(),
+                FilterEnum.temperature,
+              );
+            },
+          ),
+          24.verticalSpace,
+          _buildPresetFilters(),
+          18.verticalSpace,
+          _EditToolButton(
+            title: flashyBoothText(context, vi: '\u0110\u1ed9 s\u00e1ng', en: 'Brightness'),
+            subtitle: flashyBoothSecondaryText(
+              context,
+              vi: '\u0110\u1ed9 s\u00e1ng',
               en: 'Brightness',
             ),
             selected: _activeAdjustment == FilterEnum.brightness,
@@ -333,7 +441,7 @@ class _BackgroundSelectionScreenState extends BasePageState<
                     child: _AdjustmentSlider(
                       label: flashyBoothText(
                         context,
-                        vi: 'Cường độ sáng',
+                        vi: 'C\u01b0\u1eddng \u0111\u1ed9 s\u00e1ng',
                         en: 'Brightness level',
                       ),
                       valueLabel: FilterEnum.brightness
@@ -357,10 +465,10 @@ class _BackgroundSelectionScreenState extends BasePageState<
           ),
           18.verticalSpace,
           _EditToolButton(
-            title: flashyBoothText(context, vi: 'Đen trắng', en: 'B/W'),
+            title: flashyBoothText(context, vi: '\u0110en tr\u1eafng', en: 'B/W'),
             subtitle: flashyBoothSecondaryText(
               context,
-              vi: 'Đen trắng',
+              vi: '\u0110en tr\u1eafng',
               en: 'B/W',
             ),
             selected: _activeAdjustment == FilterEnum.saturation,
@@ -379,7 +487,7 @@ class _BackgroundSelectionScreenState extends BasePageState<
                     child: _AdjustmentSlider(
                       label: flashyBoothText(
                         context,
-                        vi: 'Mức đen trắng',
+                        vi: 'M\u1ee9c \u0111en tr\u1eafng',
                         en: 'B/W level',
                       ),
                       valueLabel: '${blackWhiteValue.round()}%',
@@ -405,10 +513,10 @@ class _BackgroundSelectionScreenState extends BasePageState<
           ),
           18.verticalSpace,
           _EditToolButton(
-            title: flashyBoothText(context, vi: 'Lật ngang', en: 'Flip H'),
+            title: flashyBoothText(context, vi: 'L\u1eadt ngang', en: 'Flip H'),
             subtitle: flashyBoothSecondaryText(
               context,
-              vi: 'Lật ngang',
+              vi: 'L\u1eadt ngang',
               en: 'Flip H',
             ),
             selected: appState.imageParam.isFlipped,
@@ -419,6 +527,104 @@ class _BackgroundSelectionScreenState extends BasePageState<
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildAdjustmentTool({
+    required String title,
+    required String subtitle,
+    required String label,
+    required FilterEnum activeType,
+    required double value,
+    required double min,
+    required double max,
+    required int divisions,
+    required ValueChanged<double> onChanged,
+    required VoidCallback onReset,
+    String? valueLabel,
+  }) {
+    return Column(
+      children: [
+        _EditToolButton(
+          title: title,
+          subtitle: subtitle,
+          selected: _activeAdjustment == activeType,
+          onTap: () {
+            setState(() {
+              _activeAdjustment = activeType;
+            });
+          },
+        ),
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 180),
+          child: _activeAdjustment == activeType
+              ? Padding(
+                  key: ValueKey('${activeType.name}-slider'),
+                  padding: EdgeInsets.only(top: 12.h),
+                  child: _AdjustmentSlider(
+                    label: label,
+                    valueLabel: valueLabel ?? '${value.round()}',
+                    value: value,
+                    min: min,
+                    max: max,
+                    divisions: divisions,
+                    onChanged: onChanged,
+                    onReset: onReset,
+                  ),
+                )
+              : const SizedBox.shrink(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPresetFilters() {
+    if (provider.presetCategory.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    final categoryIndex = provider.currentPresetCategoryIndex.clamp(
+      0,
+      provider.presetCategory.length - 1,
+    );
+    final presets = provider.presetCategory[categoryIndex].presets;
+    if (presets.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          flashyBoothText(context, vi: 'B\u1ed9 l\u1ecdc', en: 'Presets'),
+          style: TextStyle(
+            fontFamily: 'Lexend',
+            fontSize: 18.sp,
+            fontWeight: FontWeight.w900,
+            color: FlashyBoothColors.pink,
+          ),
+        ),
+        12.verticalSpace,
+        Wrap(
+          spacing: 8.w,
+          runSpacing: 8.h,
+          children: List.generate(
+            presets.length > 8 ? 8 : presets.length,
+            (index) {
+              final preset = presets[index];
+              final selected = provider.currentFilterIndex == index;
+              return _PresetFilterChip(
+                label: preset.presetName,
+                selected: selected,
+                onTap: () {
+                  provider.changeCurrentFilterIndex(index);
+                  setState(() {
+                    _activeAdjustment = null;
+                  });
+                },
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 
@@ -566,12 +772,12 @@ class _BackgroundSelectionScreenState extends BasePageState<
               FlashyBoothScreenTitle(
                 title: flashyBoothText(
                   context,
-                  vi: 'Chọn nền',
+                  vi: 'Ch\u1ecdn n\u1ec1n',
                   en: 'Select Background',
                 ),
                 subtitle: flashyBoothSecondaryText(
                   context,
-                  vi: 'Chọn nền',
+                  vi: 'Ch\u1ecdn n\u1ec1n',
                   en: 'Select Background',
                 ),
                 align: TextAlign.right,
@@ -657,7 +863,7 @@ class _BackgroundSelectionScreenState extends BasePageState<
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
-              flashyBoothText(context, vi: 'In ảnh', en: 'Print'),
+              flashyBoothText(context, vi: 'In \u1ea3nh', en: 'Print'),
               style: TextStyle(
                 fontFamily: 'Lexend',
                 fontSize: 26.sp,
@@ -688,11 +894,11 @@ class _BackgroundSelectionScreenState extends BasePageState<
         style: ToastificationStyle.minimal,
         context: context,
         title:
-            Text(flashyBoothTextRead(context, vi: 'Thông báo', en: 'Notice')),
+            Text(flashyBoothTextRead(context, vi: 'Th\u00f4ng b\u00e1o', en: 'Notice')),
         description: Text(
           flashyBoothTextRead(
             context,
-            vi: 'Hãy chọn nền trước khi tiếp tục',
+            vi: 'H\u00e3y ch\u1ecdn n\u1ec1n tr\u01b0\u1edbc khi ti\u1ebfp t\u1ee5c',
             en: 'Please select a background before continuing',
           ),
         ),
@@ -706,8 +912,8 @@ class _BackgroundSelectionScreenState extends BasePageState<
 
   String _backgroundCategoryLabel(BuildContext context, String? label) {
     final normalized = (label ?? '').trim();
-    if (normalized.isEmpty || normalized.toLowerCase() == 'mặc định') {
-      return flashyBoothText(context, vi: 'Mặc định', en: 'Default');
+    if (normalized.isEmpty || normalized.toLowerCase() == 'm\u1eb7c \u0111\u1ecbnh') {
+      return flashyBoothText(context, vi: 'M\u1eb7c \u0111\u1ecbnh', en: 'Default');
     }
     return normalized;
   }
@@ -1039,6 +1245,50 @@ class _CategoryChip extends StatelessWidget {
             style: TextStyle(
               fontFamily: 'Lexend',
               fontSize: 17.sp,
+              fontWeight: FontWeight.w800,
+              color: selected ? Colors.white : FlashyBoothColors.pink,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PresetFilterChip extends StatelessWidget {
+  const _PresetFilterChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected ? FlashyBoothColors.pink : Colors.white,
+      borderRadius: BorderRadius.circular(999.r),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(999.r),
+        child: Container(
+          constraints: BoxConstraints(minWidth: 76.w),
+          padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 9.h),
+          decoration: BoxDecoration(
+            border: Border.all(color: FlashyBoothColors.pink, width: 1.4.w),
+            borderRadius: BorderRadius.circular(999.r),
+          ),
+          child: Text(
+            label.isEmpty ? 'Filter' : label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontFamily: 'Lexend',
+              fontSize: 12.sp,
               fontWeight: FontWeight.w800,
               color: selected ? Colors.white : FlashyBoothColors.pink,
             ),

@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 
@@ -14,7 +14,6 @@ import 'package:project_l/common/util/directory_utils.dart';
 import 'package:project_l/common/util/frame_overlay_mask_utils.dart';
 import 'package:project_l/features/photo_selection/provider/photo_selection_screen_listen_state.dart';
 import 'package:project_l/features/photo_selection/provider/photo_selection_screen_provider.dart';
-import 'package:project_l/gen/assets.gen.dart';
 import 'package:project_l/resources/app_text_style.dart';
 import 'package:project_l/resources/components/common_image_file.dart';
 import 'package:project_l/resources/flashy_booth_theme.dart';
@@ -152,7 +151,7 @@ class _PhotoSelectionScreenState extends BasePageState<
 
     try {
       final assetBytes =
-          (await rootBundle.load('KHUNG TRƠN TRẮNG/demo_layout.jpg'))
+          (await rootBundle.load('KHUNG TR\u01a0N TR\u1eaeNG/demo_layout.jpg'))
               .buffer
               .asUint8List();
       final folder = await DirectoryUtils.documentDirectory(
@@ -282,7 +281,7 @@ class _PhotoSelectionScreenState extends BasePageState<
                       child: Text(
                         flashyBoothText(
                           context,
-                          vi: 'Đang tạo ảnh mẫu...',
+                          vi: '\u0110ang t\u1ea1o \u1ea3nh m\u1eabu...',
                           en: 'Preparing sample photos...',
                         ),
                         style: style32400.copyWith(
@@ -332,7 +331,7 @@ class _PhotoSelectionScreenState extends BasePageState<
                     Text(
                       flashyBoothText(
                         context,
-                        vi: 'Nhấn ảnh để hủy chọn',
+                        vi: 'Nh\u1ea5n \u1ea3nh \u0111\u1ec3 h\u1ee7y ch\u1ecdn',
                         en: 'Tap photo to deselect',
                       ),
                       style: style24400.copyWith(
@@ -345,7 +344,7 @@ class _PhotoSelectionScreenState extends BasePageState<
                     Text(
                       flashyBoothSecondaryText(
                         context,
-                        vi: 'Nhấn ảnh để hủy chọn',
+                        vi: 'Nh\u1ea5n \u1ea3nh \u0111\u1ec3 h\u1ee7y ch\u1ecdn',
                         en: 'Tap photo to deselect',
                       ),
                       style: style24400.copyWith(
@@ -369,7 +368,7 @@ class _PhotoSelectionScreenState extends BasePageState<
                     Text(
                       flashyBoothText(
                         context,
-                        vi: '$selectedCount / $requiredCount ảnh đã chọn',
+                        vi: '$selectedCount / $requiredCount \u1ea3nh \u0111\u00e3 ch\u1ecdn',
                         en: '$selectedCount / $requiredCount selected',
                       ),
                       textAlign: TextAlign.center,
@@ -418,7 +417,7 @@ class _PhotoSelectionTitle extends StatelessWidget {
               TextSpan(
                 text: flashyBoothText(
                   context,
-                  vi: 'Vui lòng chọn ảnh ',
+                  vi: 'Vui l\u00f2ng ch\u1ecdn \u1ea3nh ',
                   en: 'Select photos ',
                 ),
                 style: style5272400.copyWith(
@@ -430,7 +429,7 @@ class _PhotoSelectionTitle extends StatelessWidget {
               TextSpan(
                 text: flashyBoothText(
                   context,
-                  vi: '(Có thể chọn trùng ảnh)',
+                  vi: '(C\u00f3 th\u1ec3 ch\u1ecdn tr\u00f9ng \u1ea3nh)',
                   en: '(Duplicates OK)',
                 ),
                 style: style24400.copyWith(
@@ -446,7 +445,7 @@ class _PhotoSelectionTitle extends StatelessWidget {
         Text(
           flashyBoothSecondaryText(
             context,
-            vi: 'Vui lòng chọn ảnh (Có thể chọn trùng ảnh)',
+            vi: 'Vui l\u00f2ng ch\u1ecdn \u1ea3nh (C\u00f3 th\u1ec3 ch\u1ecdn tr\u00f9ng \u1ea3nh)',
             en: 'Select photos (Duplicates OK)',
           ),
           maxLines: 1,
@@ -572,8 +571,6 @@ class _ShotTile extends StatelessWidget {
                 ),
               ),
             ),
-            8.verticalSpace,
-            _RetakePill(),
           ],
         ),
       ),
@@ -581,49 +578,6 @@ class _ShotTile extends StatelessWidget {
   }
 }
 
-class _RetakePill extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 132.w,
-      height: 34.h,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(999.r),
-        border: Border.all(color: FlashyBoothColors.pink, width: 1.5.w),
-        boxShadow: [
-          BoxShadow(
-            color: FlashyBoothColors.pink.withValues(alpha: 0.12),
-            blurRadius: 7.r,
-            offset: Offset(0, 3.h),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Assets.icons.redoIc.svg(
-            width: 12.w,
-            colorFilter: ColorFilter.mode(
-              FlashyBoothColors.pink,
-              BlendMode.srcIn,
-            ),
-          ),
-          SizedBox(width: 5.w),
-          Text(
-            flashyBoothText(context, vi: 'Chụp lại', en: 'Retake'),
-            style: style20400.copyWith(
-              color: FlashyBoothColors.pink,
-              fontSize: 15.sp,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 class _SelectedSlotsPanel extends StatelessWidget {
   const _SelectedSlotsPanel({

@@ -264,9 +264,8 @@ class _ChooseFrameScreenState extends BasePageState<ChooseFrameListenState,
 
   Widget _renderFrame(FramesInfo frame, int index) {
     final selected = provider.selectedFrame == index;
-    final isVertical = frame.isVertical();
-    final previewWidth = isVertical ? 108.w : 172.w;
-    final previewHeight = isVertical ? 178.h : 126.h;
+    final previewWidth = 172.w;
+    final previewHeight = 178.h;
     final label = (frame.frameCd ?? 'Frame').replaceAll('_', ' ');
     return GestureDetector(
       onTap: () {
@@ -302,7 +301,9 @@ class _ChooseFrameScreenState extends BasePageState<ChooseFrameListenState,
             SizedBox(
               width: previewWidth,
               height: previewHeight,
-              child: Center(child: _FrameImage(frame: frame)),
+              child: _FramePreviewSurface(
+                child: _FrameImage(frame: frame),
+              ),
             ),
             10.verticalSpace,
             Text(
@@ -338,6 +339,37 @@ class _ChooseFrameScreenState extends BasePageState<ChooseFrameListenState,
   String _formatPrice(FramesInfo frame) {
     final price = frame.price ?? 0;
     return price.toMoney;
+  }
+}
+
+class _FramePreviewSurface extends StatelessWidget {
+  const _FramePreviewSurface({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFEAF4),
+        borderRadius: BorderRadius.circular(10.r),
+        border: Border.all(
+          color: FlashyBoothColors.pink.withValues(alpha: 0.18),
+          width: 1.w,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 10.r,
+            offset: Offset(0, 4.h),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: EdgeInsets.all(6.r),
+        child: Center(child: child),
+      ),
+    );
   }
 }
 

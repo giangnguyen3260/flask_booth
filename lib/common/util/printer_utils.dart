@@ -106,26 +106,50 @@ class PrinterUtils {
   * This function is used to change printer setting
   * */
   Future<bool> changeCutMode(PrinterCutMode cutMode) async {
-    print('PrinterUtils.changeCutMode skipped: $cutMode');
-    return true;
+    final presetPath = _resolveAssetFile(
+      cutMode == PrinterCutMode.standard ? _normalCutPath : _twoInchCutPath,
+    );
+    if (!File(presetPath).existsSync()) {
+      print('PrinterUtils.changeCutMode missing preset: $presetPath');
+      return false;
+    }
 
-    String executablePath = Platform.resolvedExecutable;
-    String executableDir = path.dirname(executablePath);
     String cmd =
         'printui.dll,PrintUIEntry /Sr /n "${PrinterConstants.printerName}" /a ';
     switch (cutMode) {
       case PrinterCutMode.standard:
-        cmd += '"$executableDir\\${_normalCutPath.replaceAll("/", "\\")}"';
+        cmd += '"$presetPath"';
         break;
       case PrinterCutMode.twoInch:
-        cmd += '"$executableDir/${_twoInchCutPath.replaceAll("/", "\\")}"';
+        cmd += '"$presetPath"';
         break;
     }
-    print("$cmd u");
-    return await _printerMethodChannel.invokeMethod<bool>("change_mode", {
-          "command": "$cmd u",
-        }) ??
-        false;
+    final command = '$cmd u';
+    print('PrinterUtils.changeCutMode mode=$cutMode command=$command');
+    final result =
+        await _printerMethodChannel.invokeMethod<bool>("change_mode", {
+              "command": command,
+            }).timeout(const Duration(seconds: 30)) ??
+            false;
+    print('PrinterUtils.changeCutMode result=$result mode=$cutMode');
+    return result;
+  }
+
+  String _resolveAssetFile(String assetPath) {
+    if (File(assetPath).existsSync()) {
+      return path.normalize(assetPath);
+    }
+    final executableDir = path.dirname(Platform.resolvedExecutable);
+    final bundledPath = path.joinAll([
+      executableDir,
+      'data',
+      'flutter_assets',
+      ...assetPath.split('/'),
+    ]);
+    if (File(bundledPath).existsSync()) {
+      return path.normalize(bundledPath);
+    }
+    return path.normalize(assetPath);
   }
 
   /*

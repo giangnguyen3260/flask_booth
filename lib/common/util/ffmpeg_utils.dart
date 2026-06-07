@@ -299,8 +299,9 @@ class FfmpegUtils {
 
     String filterComplex = '';
     filterComplex +=
-        '[0:v] format=rgba,pad=width=ceil(iw/2)*2:height=ceil(ih/2)*2 [bg_padded1];';
-    String lastOutput = '[bg_padded1]';
+        '[0:v] format=rgba,pad=width=ceil(iw/2)*2:height=ceil(ih/2)*2,split=2 [bg_base][bg_top0];';
+    String lastOutput = '[bg_base]';
+    String backgroundTopOutput = '[bg_top0]';
 
     for (int i = 0; i < images.length; i++) {
       String currentInput = '[${i + 1}:v]';
@@ -333,7 +334,8 @@ class FfmpegUtils {
     String finalInputIndex = '[${images.length + 1}:v]';
     filterComplex +=
         '$finalInputIndex pad=width=ceil(iw/2)*2:height=ceil(ih/2)*2 [frame_padded];';
-    filterComplex += '$lastOutput[frame_padded] overlay=0:0';
+    filterComplex += '$lastOutput[frame_padded] overlay=0:0 [with_frame];';
+    filterComplex += '[with_frame]$backgroundTopOutput overlay=0:0';
 
     command.add("-filter_threads");
     command.add("$threadCount");
