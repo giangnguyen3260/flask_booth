@@ -182,27 +182,12 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
       finalPrintImagePath = printingImage;
       notifyListeners();
 
-      final selectedVideos = _resolveSelectedVideoPaths();
-      final videoPaths = <String>[];
-      if (selectedVideos.isNotEmpty) {
-        preparationStatus = 'Preparing video...';
-        notifyListeners();
-        logD('Printing merge video start: videos=${selectedVideos.length}');
-        var mergedVideo = await _ffmpegUtils.mergeVideo(
-            backgroundPath: backgroundPath,
-            frameOverlayPath: frameOverlayPath,
-            videos: selectedVideos,
-            transparents: transparent,
-            params: appState.imageParam.pansAndScales,
-            flip: appState.imageParam.isFlipped);
-        videoPaths.add(mergedVideo);
-        logD('Printing merge video done: $mergedVideo');
-      } else {
-        logE(
-          'Printing merge video skipped: no valid video files '
-          'from ${appState.imageParam.videos.length} selected paths',
-        );
-      }
+      final videoPaths = await _prepareVideoPaths(
+        backgroundPath: backgroundPath,
+        frameOverlayPath: frameOverlayPath,
+        uploadImage: uploadImage,
+        transparents: transparent,
+      );
 
       preparationStatus = 'Saving upload for later...';
       notifyListeners();
@@ -342,6 +327,61 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
       final extension = videoPath.split('.').lastOrNull?.trim().toLowerCase();
       return extension != null && supportedExtensions.contains('.$extension');
     }).toList();
+  }
+
+  Future<List<String>> _prepareVideoPaths({
+    required String backgroundPath,
+    required String frameOverlayPath,
+    required String uploadImage,
+    required List<List<double>> transparents,
+  }) async {
+    final mode = appState.videoExportMode;
+    final videoPaths = <String>[];
+    try {
+      if (mode == 'skip') {
+        logD('Printing video skipped by config');
+        return videoPaths;
+      }
+
+      if (mode == 'slideshow') {
+        preparationStatus = 'Preparing lightweight video...';
+        notifyListeners();
+        logD('Printing slideshow video start: image=$uploadImage');
+        final slideshowVideo = await _ffmpegUtils
+            .createLightweightSlideshowVideo(
+          imagePath: uploadImage,
+        );
+        videoPaths.add(slideshowVideo);
+        logD('Printing slideshow video done: $slideshowVideo');
+        return videoPaths;
+      }
+
+      final selectedVideos = _resolveSelectedVideoPaths();
+      if (selectedVideos.isEmpty) {
+        logE(
+          'Printing merge video skipped: no valid video files '
+          'from ${appState.imageParam.videos.length} selected paths',
+        );
+        return videoPaths;
+      }
+
+      preparationStatus = 'Preparing video...';
+      notifyListeners();
+      logD('Printing merge video start: videos=${selectedVideos.length}');
+      final mergedVideo = await _ffmpegUtils.mergeVideo(
+          backgroundPath: backgroundPath,
+          frameOverlayPath: frameOverlayPath,
+          videos: selectedVideos,
+          transparents: transparents,
+          params: appState.imageParam.pansAndScales,
+          flip: appState.imageParam.isFlipped);
+      videoPaths.add(mergedVideo);
+      logD('Printing merge video done: $mergedVideo');
+    } catch (error, stackTrace) {
+      logE(error, stackTrace: stackTrace);
+      logE('Printing video export failed, continue with image only');
+    }
+    return videoPaths;
   }
 
   int _resolvePrintCopies({required bool isCut}) {

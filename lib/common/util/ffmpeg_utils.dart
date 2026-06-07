@@ -21,10 +21,12 @@ class FfmpegUtils {
   static const Duration _imageMergeTimeout = Duration(seconds: 90);
   static const Duration _imageSlotTimeout = Duration(seconds: 30);
   static const Duration _videoMergeTimeout = Duration(minutes: 8);
+  static const Duration _videoSlotTimeout = Duration(seconds: 90);
   static const int _imageMergeThreads = 1;
   static const int _videoMergeThreads = 1;
   static const int _videoOutputFps = 10;
   static const int _videoCrf = 28;
+  static const int _videoSlotCrf = 30;
 
   late final String baseImagePath;
   late final String baseVideoPath;
@@ -408,21 +410,145 @@ class FfmpegUtils {
       required List<List<double>> transparents,
       required List<MatrixParam> params,
       required bool flip}) async {
+    final preparedSlots = await _prepareVideoSlots(
+      videos: videos,
+      transparents: transparents,
+      params: params,
+      flip: flip,
+    );
+    try {
+      return await _mergePreparedVideoSlots(
+        backgroundPath: backgroundPath,
+        frameOverlayPath: frameOverlayPath,
+        slots: preparedSlots,
+        transparents: transparents,
+      );
+    } finally {
+      for (final slotPath in preparedSlots) {
+        try {
+          final slotFile = File(slotPath);
+          if (slotFile.existsSync()) {
+            await slotFile.delete();
+          }
+        } catch (_) {
+          // Temporary slot cleanup is best-effort.
+        }
+      }
+    }
+  }
+
+  Future<List<String>> _prepareVideoSlots({
+    required List<String> videos,
+    required List<List<double>> transparents,
+    required List<MatrixParam> params,
+    required bool flip,
+  }) async {
+    _validateImageMergeInputs(
+      images: videos,
+      transparents: transparents,
+      params: params,
+    );
+
+    final slotPaths = <String>[];
+    final slotDirectory = Directory(path.join(
+      _savedVideoPath,
+      'video_slots_${DateTimeUtils.format(date: DateTime.now(), format: "dd_MM_yyyy_HH_mm_ss_SSS")}',
+    ));
+    await slotDirectory.create(recursive: true);
+
+    try {
+      for (var i = 0; i < videos.length; i++) {
+        final slotOutput = path.join(slotDirectory.path, 'VideoSlot_$i.mp4');
+        final slotWidth = _positiveInt(transparents[i][2]);
+        final slotHeight = _positiveInt(transparents[i][3]);
+        final cropX = params[i].panX.abs();
+        final cropY = params[i].panY.abs();
+        final requestedScale = params[i].scale <= 0 ? 1.0 : params[i].scale;
+        final filters = <String>[
+          'fps=$_videoOutputFps',
+          if (flip) 'hflip',
+          'scale=w=max(iw*$requestedScale\\,$slotWidth):h=max(ih*$requestedScale\\,$slotHeight)',
+          'crop=$slotWidth:$slotHeight:min($cropX\\,iw-$slotWidth):min($cropY\\,ih-$slotHeight)',
+          'pad=width=ceil(iw/2)*2:height=ceil(ih/2)*2',
+        ].join(',');
+
+        final stopwatch = Stopwatch()..start();
+        if (kDebugMode) {
+          print(
+            'FFmpeg video slot start: ${i + 1}/${videos.length} '
+            'slot=${slotWidth}x$slotHeight input=${videos[i]}',
+          );
+        }
+        final outputFile = await FFMpegHelper.instance.runSync(
+          FFMpegCommand(outputFilepath: slotOutput, inputs: [
+            FFMpegInput([
+              '-i',
+              videos[i],
+              '-vf',
+              filters,
+              '-r',
+              '$_videoOutputFps',
+              '-c:v',
+              'libx264',
+              '-preset',
+              'ultrafast',
+              '-crf',
+              '$_videoSlotCrf',
+              '-pix_fmt',
+              'yuv420p',
+              '-an',
+              '-movflags',
+              '+faststart',
+            ]),
+          ]),
+          timeout: _videoSlotTimeout,
+        );
+        if (outputFile == null || !outputFile.existsSync()) {
+          throw StateError(
+              'FFmpeg video slot failed: index=$i output=$slotOutput');
+        }
+        if (kDebugMode) {
+          print(
+            'FFmpeg video slot done: ${i + 1}/${videos.length} '
+            'elapsed=${stopwatch.elapsedMilliseconds}ms output=$slotOutput',
+          );
+        }
+        slotPaths.add(slotOutput);
+      }
+      return slotPaths;
+    } catch (_) {
+      for (final slotPath in slotPaths) {
+        try {
+          final slotFile = File(slotPath);
+          if (slotFile.existsSync()) {
+            await slotFile.delete();
+          }
+        } catch (_) {
+          // Temporary slot cleanup is best-effort.
+        }
+      }
+      rethrow;
+    }
+  }
+
+  Future<String> _mergePreparedVideoSlots({
+    required String backgroundPath,
+    required String frameOverlayPath,
+    required List<String> slots,
+    required List<List<double>> transparents,
+  }) async {
     var videoOutput = path.join(_savedVideoPath,
         "Output_${DateTimeUtils.format(date: DateTime.now(), format: "dd_MM_yyyy_HH_mm")}.mp4");
 
     final outputFile = await FFMpegHelper.instance.runSync(
       FFMpegCommand(outputFilepath: videoOutput, inputs: [
         FFMpegInput([
-          ...generateOverlayCommand(
+          ...generatePreparedVideoSlotOverlayCommand(
             backgroundPath: backgroundPath,
             frameOverlayPath: frameOverlayPath,
-            images: videos,
+            slots: slots,
             transparents: transparents,
-            params: params,
-            flip: flip,
             threadCount: _videoMergeThreads,
-            fps: _videoOutputFps,
           ),
           '-r',
           '$_videoOutputFps',
@@ -437,6 +563,7 @@ class FfmpegUtils {
           '-an',
           '-movflags',
           '+faststart',
+          '-shortest',
         ]),
       ]),
       timeout: _videoMergeTimeout,
@@ -444,7 +571,50 @@ class FfmpegUtils {
     if (outputFile == null || !outputFile.existsSync()) {
       throw StateError('FFmpeg video merge failed: $videoOutput');
     }
+    return videoOutput;
+  }
 
+  Future<String> createLightweightSlideshowVideo({
+    required String imagePath,
+    Duration duration = const Duration(seconds: 6),
+  }) async {
+    final videoOutput = path.join(_savedVideoPath,
+        "Slideshow_${DateTimeUtils.format(date: DateTime.now(), format: "dd_MM_yyyy_HH_mm")}.mp4");
+
+    final outputFile = await FFMpegHelper.instance.runSync(
+      FFMpegCommand(outputFilepath: videoOutput, inputs: [
+        FFMpegInput([
+          '-loop',
+          '1',
+          '-i',
+          imagePath,
+          '-vf',
+          "fps=8,scale=w='min(720,iw)':h=-2,format=yuv420p",
+          '-t',
+          '${duration.inSeconds}',
+          '-r',
+          '8',
+          '-c:v',
+          'libx264',
+          '-preset',
+          'ultrafast',
+          '-crf',
+          '34',
+          '-pix_fmt',
+          'yuv420p',
+          '-an',
+          '-movflags',
+          '+faststart',
+          '-threads',
+          '$_videoMergeThreads',
+          '-y',
+        ]),
+      ]),
+      timeout: const Duration(seconds: 45),
+    );
+    if (outputFile == null || !outputFile.existsSync()) {
+      throw StateError('FFmpeg slideshow video failed: $videoOutput');
+    }
     return videoOutput;
   }
 
@@ -591,6 +761,68 @@ class FfmpegUtils {
         '$finalInputIndex pad=width=ceil(iw/2)*2:height=ceil(ih/2)*2 [frame_padded];';
     filterComplex += '$lastOutput[frame_padded] overlay=0:0 [with_frame];';
     filterComplex += '[with_frame]$backgroundTopOutput overlay=0:0';
+
+    command
+      ..add("-filter_threads")
+      ..add("$threadCount")
+      ..add("-filter_complex_threads")
+      ..add("$threadCount")
+      ..add('-filter_complex')
+      ..add(filterComplex.trim())
+      ..add("-threads")
+      ..add("$threadCount")
+      ..add('-y');
+
+    return command;
+  }
+
+  List<String> generatePreparedVideoSlotOverlayCommand({
+    required String backgroundPath,
+    required String frameOverlayPath,
+    required List<String> slots,
+    required List<List<double>> transparents,
+    int threadCount = 2,
+  }) {
+    if (slots.length != transparents.length) {
+      throw StateError(
+        'Video slot merge input mismatch: slots=${slots.length} '
+        'transparents=${transparents.length}',
+      );
+    }
+
+    final command = <String>['-loop', '1', '-i', backgroundPath];
+    for (final slot in slots) {
+      command
+        ..add('-i')
+        ..add(slot);
+    }
+    command
+      ..add('-loop')
+      ..add('1')
+      ..add('-i')
+      ..add(frameOverlayPath);
+
+    var filterComplex =
+        '[0:v] fps=$_videoOutputFps,format=rgba,pad=width=ceil(iw/2)*2:height=ceil(ih/2)*2,split=2 [bg_base][bg_top0];';
+    var lastOutput = '[bg_base]';
+    const backgroundTopOutput = '[bg_top0]';
+
+    for (var i = 0; i < slots.length; i++) {
+      final currentInput = '[${i + 1}:v]';
+      final formatted = '[slot$i]';
+      final nextOutput = '[v${i + 1}]';
+      filterComplex += '$currentInput fps=$_videoOutputFps,format=rgba$formatted;';
+      filterComplex +=
+          '$lastOutput$formatted overlay=${transparents[i][0]}:${transparents[i][1]}:shortest=0$nextOutput;';
+      lastOutput = nextOutput;
+    }
+
+    final finalInputIndex = '[${slots.length + 1}:v]';
+    filterComplex +=
+        '$finalInputIndex fps=$_videoOutputFps,pad=width=ceil(iw/2)*2:height=ceil(ih/2)*2 [frame_padded];';
+    filterComplex += '$lastOutput[frame_padded] overlay=0:0:shortest=0 [with_frame];';
+    filterComplex +=
+        '[with_frame]$backgroundTopOutput overlay=0:0:shortest=0';
 
     command
       ..add("-filter_threads")

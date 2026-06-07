@@ -119,6 +119,9 @@ class _PrintingScreenState extends BasePageState<PrintingScreenListenState,
       if (appState.imageParam.videos.isEmpty) {
         return;
       }
+      if (appState.imageParam.videos.length > 1) {
+        return;
+      }
 
       // Initialize first video
       var firstController =
