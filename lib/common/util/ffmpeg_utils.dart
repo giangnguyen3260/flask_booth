@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:colorfilter_generator/colorfilter_generator.dart';
 import 'package:ffmpeg_helper/ffmpeg_helper.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:image/image.dart' as img;
 import 'package:injectable/injectable.dart';
 import 'package:path/path.dart' as path;
 import 'package:project_l/common/enums/filter_enum.dart';
@@ -17,6 +19,7 @@ import 'package:project_l/gen/assets.gen.dart';
 @Singleton()
 class FfmpegUtils {
   static const Duration _imageMergeTimeout = Duration(seconds: 90);
+  static const Duration _imageSlotTimeout = Duration(seconds: 30);
   static const Duration _videoMergeTimeout = Duration(minutes: 8);
   static const int _imageMergeThreads = 1;
   static const int _videoMergeThreads = 1;
@@ -164,19 +167,149 @@ class FfmpegUtils {
       required List<List<double>> transparents,
       required List<MatrixParam> params,
       required bool flip}) async {
+    final preparedSlots = await _prepareImageSlots(
+      images: images,
+      transparents: transparents,
+      params: params,
+      flip: !flip,
+    );
+    try {
+      return await _mergePreparedImageSlots(
+        backgroundPath: backgroundPath,
+        frameOverlayPath: frameOverlayPath,
+        slots: preparedSlots,
+        transparents: transparents,
+      );
+    } finally {
+      for (final slotPath in preparedSlots) {
+        try {
+          final slotFile = File(slotPath);
+          if (slotFile.existsSync()) {
+            await slotFile.delete();
+          }
+        } catch (_) {
+          // Temporary slot cleanup is best-effort.
+        }
+      }
+    }
+  }
+
+  Future<List<String>> _prepareImageSlots({
+    required List<String> images,
+    required List<List<double>> transparents,
+    required List<MatrixParam> params,
+    required bool flip,
+  }) async {
+    _validateImageMergeInputs(
+      images: images,
+      transparents: transparents,
+      params: params,
+    );
+
+    final slotPaths = <String>[];
+    final slotDirectory = Directory(path.join(
+      _savedImagePath,
+      'slots_${DateTimeUtils.format(date: DateTime.now(), format: "dd_MM_yyyy_HH_mm_ss_SSS")}',
+    ));
+    await slotDirectory.create(recursive: true);
+
+    try {
+      for (var i = 0; i < images.length; i++) {
+        final slotOutput = path.join(slotDirectory.path, 'Slot_$i.png');
+        final slotWidth = _positiveInt(transparents[i][2]);
+        final slotHeight = _positiveInt(transparents[i][3]);
+        final sourceSize = await _readImageSize(images[i]);
+        final scale = _effectiveSlotScale(
+          sourceWidth: sourceSize.$1,
+          sourceHeight: sourceSize.$2,
+          slotWidth: slotWidth,
+          slotHeight: slotHeight,
+          requestedScale: params[i].scale,
+        );
+        final scaledWidth = math.max(slotWidth, (sourceSize.$1 * scale).ceil());
+        final scaledHeight =
+            math.max(slotHeight, (sourceSize.$2 * scale).ceil());
+        final maxCropX = math.max(0, scaledWidth - slotWidth).toDouble();
+        final maxCropY = math.max(0, scaledHeight - slotHeight).toDouble();
+        final cropX = params[i].panX.abs().clamp(0.0, maxCropX);
+        final cropY = params[i].panY.abs().clamp(0.0, maxCropY);
+        final filters = <String>[
+          if (flip) 'hflip',
+          'scale=$scaledWidth:$scaledHeight',
+          'crop=$slotWidth:$slotHeight:$cropX:$cropY',
+        ].join(',');
+
+        final stopwatch = Stopwatch()..start();
+        if (kDebugMode) {
+          print(
+            'FFmpeg image slot start: ${i + 1}/${images.length} '
+            'source=${sourceSize.$1}x${sourceSize.$2} '
+            'scaled=${scaledWidth}x$scaledHeight '
+            'slot=${slotWidth}x$slotHeight input=${images[i]}',
+          );
+        }
+        final outputFile = await FFMpegHelper.instance.runSync(
+          FFMpegCommand(outputFilepath: slotOutput, inputs: [
+            FFMpegInput([
+              '-i',
+              images[i],
+              '-vf',
+              filters,
+              '-frames:v',
+              '1',
+              '-c:v',
+              'png',
+              '-compression_level',
+              '1',
+            ]),
+          ]),
+          timeout: _imageSlotTimeout,
+        );
+        if (outputFile == null || !outputFile.existsSync()) {
+          throw StateError(
+              'FFmpeg image slot failed: index=$i output=$slotOutput');
+        }
+        if (kDebugMode) {
+          print(
+            'FFmpeg image slot done: ${i + 1}/${images.length} '
+            'elapsed=${stopwatch.elapsedMilliseconds}ms output=$slotOutput',
+          );
+        }
+        slotPaths.add(slotOutput);
+      }
+      return slotPaths;
+    } catch (_) {
+      for (final slotPath in slotPaths) {
+        try {
+          final slotFile = File(slotPath);
+          if (slotFile.existsSync()) {
+            await slotFile.delete();
+          }
+        } catch (_) {
+          // Temporary slot cleanup is best-effort.
+        }
+      }
+      rethrow;
+    }
+  }
+
+  Future<String> _mergePreparedImageSlots({
+    required String backgroundPath,
+    required String frameOverlayPath,
+    required List<String> slots,
+    required List<List<double>> transparents,
+  }) async {
     var imageOutput = path.join(_savedImagePath,
         "Output_${DateTimeUtils.format(date: DateTime.now(), format: "dd_MM_yyyy_HH_mm")}.png");
 
     final outputFile = await FFMpegHelper.instance.runSync(
       FFMpegCommand(outputFilepath: imageOutput, inputs: [
         FFMpegInput([
-          ...generateOverlayCommand(
+          ...generatePreparedSlotOverlayCommand(
             backgroundPath: backgroundPath,
             frameOverlayPath: frameOverlayPath,
-            images: images,
+            slots: slots,
             transparents: transparents,
-            params: params,
-            flip: !flip,
             threadCount: _imageMergeThreads,
           ),
           '-q:v',
@@ -191,6 +324,58 @@ class FfmpegUtils {
       throw StateError('FFmpeg image merge failed: $imageOutput');
     }
     return imageOutput;
+  }
+
+  void _validateImageMergeInputs({
+    required List<String> images,
+    required List<List<double>> transparents,
+    required List<MatrixParam> params,
+  }) {
+    if (images.length != transparents.length) {
+      throw StateError(
+        'Image merge input mismatch: images=${images.length} '
+        'transparents=${transparents.length}',
+      );
+    }
+    if (images.length != params.length) {
+      throw StateError(
+        'Image merge input mismatch: images=${images.length} '
+        'params=${params.length}',
+      );
+    }
+    for (var i = 0; i < transparents.length; i++) {
+      if (transparents[i].length < 4) {
+        throw StateError('Invalid transparent area at index $i');
+      }
+    }
+  }
+
+  int _positiveInt(double value) {
+    final rounded = value.round();
+    return rounded < 1 ? 1 : rounded;
+  }
+
+  Future<(int, int)> _readImageSize(String imagePath) async {
+    final bytes = await File(imagePath).readAsBytes();
+    final decoded = img.decodeImage(bytes);
+    if (decoded == null) {
+      throw StateError('Could not decode image size: $imagePath');
+    }
+    return (decoded.width, decoded.height);
+  }
+
+  double _effectiveSlotScale({
+    required int sourceWidth,
+    required int sourceHeight,
+    required int slotWidth,
+    required int slotHeight,
+    required double requestedScale,
+  }) {
+    final normalizedScale = requestedScale <= 0 ? 1.0 : requestedScale;
+    return math.max(
+      normalizedScale,
+      math.max(slotWidth / sourceWidth, slotHeight / sourceHeight),
+    );
   }
 
   Future<String> mergeHorizontalImage({required String imagePath}) async {
@@ -325,15 +510,18 @@ class FfmpegUtils {
       double cropH = transparents[i][3]; // crop height
 
       // Nếu flip = true thì thêm thao tác lật ngang (hflip)
+      final scaleFilter =
+          'scale=w=max(iw*$scaleX\\,$cropW):h=max(ih*$scaleY\\,$cropH)';
+      final cropFilter =
+          'crop=$cropW:$cropH:min($cropX\\,iw-$cropW):min($cropY\\,ih-$cropH)';
       final fpsPrefix = fps == null ? '' : 'fps=$fps,';
       if (flip) {
         filterComplex += '$currentInput ${fpsPrefix}hflip$flipped;';
-        filterComplex += '$flipped scale=iw*$scaleX:ih*$scaleY$scaled;';
+        filterComplex += '$flipped $scaleFilter$scaled;';
       } else {
-        filterComplex +=
-            '$currentInput ${fpsPrefix}scale=iw*$scaleX:ih*$scaleY$scaled;';
+        filterComplex += '$currentInput $fpsPrefix$scaleFilter$scaled;';
       }
-      filterComplex += '$scaled crop=$cropW:$cropH:$cropX:$cropY$cropped;';
+      filterComplex += '$scaled $cropFilter$cropped;';
       filterComplex +=
           '$lastOutput$cropped overlay=${transparents[i][0]}:${transparents[i][1]}$nextOutput;';
 
@@ -355,6 +543,65 @@ class FfmpegUtils {
     command.add("-threads");
     command.add("$threadCount");
     command.add('-y');
+
+    return command;
+  }
+
+  List<String> generatePreparedSlotOverlayCommand({
+    required String backgroundPath,
+    required String frameOverlayPath,
+    required List<String> slots,
+    required List<List<double>> transparents,
+    int threadCount = 2,
+  }) {
+    if (slots.length != transparents.length) {
+      throw StateError(
+        'Slot merge input mismatch: slots=${slots.length} '
+        'transparents=${transparents.length}',
+      );
+    }
+
+    final command = <String>['-i', backgroundPath];
+    for (final slot in slots) {
+      command
+        ..add('-i')
+        ..add(slot);
+    }
+    command
+      ..add('-i')
+      ..add(frameOverlayPath);
+
+    var filterComplex =
+        '[0:v] format=rgba,pad=width=ceil(iw/2)*2:height=ceil(ih/2)*2,split=2 [bg_base][bg_top0];';
+    var lastOutput = '[bg_base]';
+    const backgroundTopOutput = '[bg_top0]';
+
+    for (var i = 0; i < slots.length; i++) {
+      final currentInput = '[${i + 1}:v]';
+      final formatted = '[slot$i]';
+      final nextOutput = '[v${i + 1}]';
+      filterComplex += '$currentInput format=rgba$formatted;';
+      filterComplex +=
+          '$lastOutput$formatted overlay=${transparents[i][0]}:${transparents[i][1]}$nextOutput;';
+      lastOutput = nextOutput;
+    }
+
+    final finalInputIndex = '[${slots.length + 1}:v]';
+    filterComplex +=
+        '$finalInputIndex pad=width=ceil(iw/2)*2:height=ceil(ih/2)*2 [frame_padded];';
+    filterComplex += '$lastOutput[frame_padded] overlay=0:0 [with_frame];';
+    filterComplex += '[with_frame]$backgroundTopOutput overlay=0:0';
+
+    command
+      ..add("-filter_threads")
+      ..add("$threadCount")
+      ..add("-filter_complex_threads")
+      ..add("$threadCount")
+      ..add('-filter_complex')
+      ..add(filterComplex.trim())
+      ..add("-threads")
+      ..add("$threadCount")
+      ..add('-y');
 
     return command;
   }

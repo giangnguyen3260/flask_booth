@@ -105,8 +105,18 @@ class _PrintingScreenState extends BasePageState<PrintingScreenListenState,
     _maskedFrameOverlayPath = _frameOverlaySourcePath;
     unawaited(_prepareMaskedFrameOverlay());
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      await provider.exportFiles();
-      if (!mounted || appState.imageParam.videos.isEmpty) {
+      final exported = await provider.exportFiles();
+      if (!mounted) {
+        return;
+      }
+      if (!exported) {
+        await Future<void>.delayed(const Duration(seconds: 3));
+        if (mounted) {
+          navigator.replaceAll([StandByRoute()]);
+        }
+        return;
+      }
+      if (appState.imageParam.videos.isEmpty) {
         return;
       }
 

@@ -49,7 +49,7 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
     return frameOverlayPath;
   }
 
-  Future<void> exportFiles() async {
+  Future<bool> exportFiles() async {
     qrCode = Uint8List.fromList([]);
     qrUrl = '';
     finalPrintImagePath = '';
@@ -68,7 +68,7 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
         preparationStatus = 'No printable photo slots found';
         notifyListeners();
         logD('Printing export stopped: transparent areas empty');
-        return;
+        return false;
       }
 
       var printingImage = "";
@@ -125,7 +125,7 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
           'Printing mock export done: queued=$isUploadQueued qrUrl=${qrUrl.isNotEmpty}',
         );
         notifyListeners();
-        return;
+        return true;
       }
 
       preparationStatus = 'Preparing selected photos...';
@@ -257,11 +257,13 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
       }
       preparationStatus = isUploadQueued ? 'Waiting to upload when online' : '';
       notifyListeners();
+      return true;
     } catch (error, stackTrace) {
       preparationStatus = 'Could not prepare print image';
       isUploadQueued = false;
       logE(error, stackTrace: stackTrace);
       notifyListeners();
+      return false;
     }
     //
     // for (var video in appState.imageParam.videos) {
