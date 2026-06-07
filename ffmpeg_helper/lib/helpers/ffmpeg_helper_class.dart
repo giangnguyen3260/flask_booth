@@ -156,6 +156,14 @@ class FFMpegHelper {
   }
 
   String _resolveFfmpegExecutable() {
+    final configured = Platform.environment['PTB_FFMPEG_PATH'];
+    if (configured != null && configured.trim().isNotEmpty) {
+      final configuredPath = configured.trim();
+      if (File(configuredPath).existsSync()) {
+        return configuredPath;
+      }
+    }
+
     if (!Platform.isWindows) {
       return 'ffmpeg';
     }

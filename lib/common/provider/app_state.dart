@@ -648,6 +648,20 @@ class AppState extends ChangeNotifier with LogMixin {
           (Platform.isMacOS || Platform.isWindows || Platform.isLinux) &&
           !_hasLocalRuntimeConfig);
 
+  String get videoExportMode {
+    final value = _readConfigValue(
+      _readConfigSection('video'),
+      const ['mode', 'videoMode', 'video_mode'],
+    ).toLowerCase();
+    if (value == 'merge' || value == 'slideshow' || value == 'skip') {
+      return value;
+    }
+    if (value.isNotEmpty) {
+      logE('Invalid video export mode "$value", fallback to merge');
+    }
+    return 'merge';
+  }
+
   void setCurrentScreen(String screenCd) {
     currentScreen = screenCd;
   }
@@ -980,7 +994,12 @@ class AppState extends ChangeNotifier with LogMixin {
       return [];
     }
     try {
-      final decoded = jsonDecode(await file.readAsString());
+      final payload = (await file.readAsString()).trim();
+      if (payload.isEmpty) {
+        await file.writeAsString('[]', flush: true);
+        return [];
+      }
+      final decoded = jsonDecode(payload);
       if (decoded is List) {
         return decoded
             .whereType<Map>()
@@ -989,6 +1008,7 @@ class AppState extends ChangeNotifier with LogMixin {
       }
     } catch (error, stackTrace) {
       logE(error, stackTrace: stackTrace);
+      await file.writeAsString('[]', flush: true);
     }
     return [];
   }
