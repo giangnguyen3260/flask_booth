@@ -179,7 +179,7 @@ class _ShootingScreenState extends BasePageState<ShootingScreenListenState,
         setState(() {
           final cameraDescription = _pickPreferredCamera(value);
           controller = CameraController(
-              cameraDescription, ResolutionPreset.veryHigh,
+              cameraDescription, ResolutionPreset.medium,
               enableAudio: false);
           controller!.initialize().then((_) {
             if (!mounted) {

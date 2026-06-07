@@ -19,7 +19,9 @@ class FfmpegUtils {
   static const Duration _imageMergeTimeout = Duration(seconds: 90);
   static const Duration _videoMergeTimeout = Duration(minutes: 8);
   static const int _imageMergeThreads = 1;
-  static const int _videoMergeThreads = 2;
+  static const int _videoMergeThreads = 1;
+  static const int _videoOutputFps = 10;
+  static const int _videoCrf = 28;
 
   late final String baseImagePath;
   late final String baseVideoPath;
@@ -235,15 +237,19 @@ class FfmpegUtils {
             params: params,
             flip: flip,
             threadCount: _videoMergeThreads,
+            fps: _videoOutputFps,
           ),
+          '-r',
+          '$_videoOutputFps',
           '-c:v',
           'libx264',
-          '-c:a',
-          'aac',
           '-preset',
           'ultrafast',
           '-crf',
-          '23',
+          '$_videoCrf',
+          '-pix_fmt',
+          'yuv420p',
+          '-an',
           '-movflags',
           '+faststart',
         ]),
@@ -282,6 +288,7 @@ class FfmpegUtils {
     required List<MatrixParam> params,
     required bool flip, // Thêm biến bool flip vào đây
     int threadCount = 2,
+    int? fps,
   }) {
     if (images.length != transparents.length) {
       throw Exception('Số lượng images và transparents phải bằng nhau');
@@ -318,11 +325,13 @@ class FfmpegUtils {
       double cropH = transparents[i][3]; // crop height
 
       // Nếu flip = true thì thêm thao tác lật ngang (hflip)
+      final fpsPrefix = fps == null ? '' : 'fps=$fps,';
       if (flip) {
-        filterComplex += '$currentInput hflip$flipped;';
+        filterComplex += '$currentInput ${fpsPrefix}hflip$flipped;';
         filterComplex += '$flipped scale=iw*$scaleX:ih*$scaleY$scaled;';
       } else {
-        filterComplex += '$currentInput scale=iw*$scaleX:ih*$scaleY$scaled;';
+        filterComplex +=
+            '$currentInput ${fpsPrefix}scale=iw*$scaleX:ih*$scaleY$scaled;';
       }
       filterComplex += '$scaled crop=$cropW:$cropH:$cropX:$cropY$cropped;';
       filterComplex +=
@@ -389,7 +398,7 @@ class FfmpegUtils {
     var videoPathSplit = videoPath.split("\\");
     if (videoPathSplit.isEmpty) return;
     var videoOutput = path.join(_savedVideoPath,
-        "Preprocess_${DateTimeUtils.format(date: DateTime.now(), format: "dd_MM_yyyy_HH_mm_ss")}.webm");
+        "Preprocess_${DateTimeUtils.format(date: DateTime.now(), format: "dd_MM_yyyy_HH_mm_ss")}.mp4");
     int scaledWidth = roundToNearestEven(width);
     int scaledHeight = roundToNearestEven(height);
     await FFMpegHelper.instance.runAsync(
@@ -398,24 +407,25 @@ class FfmpegUtils {
             '-i',
             videoPath,
             '-filter_complex',
-            '[0:v]scale=$scaledWidth:$scaledHeight:force_original_aspect_ratio=increase[scaled];[scaled]crop=$scaledWidth:$scaledHeight[cropped];[cropped]hflip',
+            '[0:v]fps=$_videoOutputFps,scale=$scaledWidth:$scaledHeight:force_original_aspect_ratio=increase[scaled];[scaled]crop=$scaledWidth:$scaledHeight[cropped];[cropped]hflip',
             '-ss',
             '1',
             '-t',
             '$second',
             "-c:v",
-            "libvpx",
-            "-b:v",
-            "2M",
-            "-c:a",
-            "libopus",
-            "-cpu-used",
-            "8",
+            "libx264",
+            "-preset",
+            "ultrafast",
+            "-crf",
+            "$_videoCrf",
+            "-pix_fmt",
+            "yuv420p",
+            "-an",
+            "-movflags",
+            "+faststart",
             "-threads",
-            "2",
+            "$_videoMergeThreads",
             '-y',
-            '-q:v',
-            '2',
           ]),
         ]),
         onComplete: onComplete);
@@ -434,12 +444,17 @@ class FfmpegUtils {
           '$fps',
           '-i',
           framePattern,
+          '-r',
+          '$_videoOutputFps',
           '-c:v',
           'libx264',
           '-preset',
           'ultrafast',
+          '-crf',
+          '$_videoCrf',
           '-pix_fmt',
           'yuv420p',
+          '-an',
           '-movflags',
           '+faststart',
         ]),

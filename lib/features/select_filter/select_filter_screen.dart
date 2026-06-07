@@ -49,7 +49,7 @@ class _SelectFilterScreenState extends BasePageState<SelectFilterListenState,
     appState.cameraPowerUtil.turnOnCamera();
     provider.init();
     CameraPlatform.instance.availableCameras().then((value) {
-      controller = CameraController(value[0], ResolutionPreset.veryHigh,
+      controller = CameraController(value[0], ResolutionPreset.medium,
           enableAudio: false);
       controller!.initialize().then((_) {
         if (!mounted) {

@@ -105,8 +105,8 @@ class _PrintingScreenState extends BasePageState<PrintingScreenListenState,
     _maskedFrameOverlayPath = _frameOverlaySourcePath;
     unawaited(_prepareMaskedFrameOverlay());
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      if (appState.imageParam.videos.isEmpty) {
-        provider.exportFiles();
+      await provider.exportFiles();
+      if (!mounted || appState.imageParam.videos.isEmpty) {
         return;
       }
 
@@ -129,9 +129,6 @@ class _PrintingScreenState extends BasePageState<PrintingScreenListenState,
       }
 
       setState(() {}); // Update the UI after initializing all controllers
-
-      // Export files after all videos are loaded
-      provider.exportFiles();
     });
   }
 
