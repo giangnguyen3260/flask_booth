@@ -659,9 +659,9 @@ class AppState extends ChangeNotifier with LogMixin {
       return value;
     }
     if (value.isNotEmpty) {
-      logE('Invalid video export mode "$value", fallback to merge');
+      logE('Invalid video export mode "$value", fallback to slideshow');
     }
-    return 'merge';
+    return 'slideshow';
   }
 
   void setCurrentScreen(String screenCd) {

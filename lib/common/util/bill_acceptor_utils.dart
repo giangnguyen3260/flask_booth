@@ -145,6 +145,7 @@ class BillAcceptorUtils with LogMixin {
   }) {
     try {
       if (!_isConnected) {
+        logE('Skipped sending ${command.name}: bill acceptor is disconnected');
         return false;
       }
       var result = _serialPort.write(Uint8List(1)..[0] = command.value);
@@ -178,8 +179,8 @@ class BillAcceptorUtils with LogMixin {
 
   void closeSection() {
     try {
-      _isConnected = false;
       _subscription?.cancel();
+      _subscription = null;
     } catch (e) {
       //
     }
