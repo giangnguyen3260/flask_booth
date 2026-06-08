@@ -109,13 +109,13 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
             printQuantity: appState.imageParam.printQuantity,
             uploadNow: false);
 
-        qrUrl = response?.qrUrl ?? '';
+        qrUrl = _resolveQrUrl(response?.qrUrl);
         isUploadQueued = response == null;
-        if (response?.qrUrl?.isNotEmpty ?? false) {
+        if (qrUrl.isNotEmpty) {
           preparationStatus = 'Generating QR...';
           notifyListeners();
           qrCode = await _qrUtils.generateQr(
-            encodedString: response?.qrUrl ?? '',
+            encodedString: qrUrl,
             size: 250,
           );
         }
@@ -202,13 +202,13 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
           printQuantity: appState.imageParam.printQuantity,
           uploadNow: false);
 
-      qrUrl = response?.qrUrl ?? '';
+      qrUrl = _resolveQrUrl(response?.qrUrl);
       isUploadQueued = response == null;
-      if (response?.qrUrl?.isNotEmpty ?? false) {
+      if (qrUrl.isNotEmpty) {
         preparationStatus = 'Generating QR...';
         notifyListeners();
         qrCode = await _qrUtils.generateQr(
-          encodedString: response?.qrUrl ?? '',
+          encodedString: qrUrl,
           size: 250,
         );
       }
@@ -316,6 +316,20 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
     return appState.imageParam.videos
         .where((path) => path.isNotEmpty && File(path).existsSync())
         .toList();
+  }
+
+  String _resolveQrUrl(String? apiQrUrl) {
+    final normalizedApiQrUrl = apiQrUrl?.trim() ?? '';
+    if (normalizedApiQrUrl.isNotEmpty) {
+      return normalizedApiQrUrl;
+    }
+
+    final baseUrl = appState.remoteApiBaseUrl.trim();
+    final saleNo = appState.imageParam.session.trim();
+    if (baseUrl.isEmpty || saleNo.isEmpty) {
+      return '';
+    }
+    return '${baseUrl.replaceFirst(RegExp(r'/+$'), '')}/pub/results/$saleNo';
   }
 
   List<String> _resolveSelectedVideoPaths() {

@@ -490,6 +490,7 @@ class AppState extends ChangeNotifier with LogMixin {
       );
       job['status'] = 'uploaded';
       job['qrUrl'] = response.qrUrl;
+      await _cleanupUploadedQueueFiles(job);
       job['updatedAt'] = DateTime.now().toUtc().toIso8601String();
       await _upsertUploadJob(job);
       return response;
@@ -518,6 +519,7 @@ class AppState extends ChangeNotifier with LogMixin {
         final response = await _submitUploadJob(job);
         job['status'] = 'uploaded';
         job['qrUrl'] = response.qrUrl;
+        await _cleanupUploadedQueueFiles(job);
       } catch (error, stackTrace) {
         logE(error, stackTrace: stackTrace);
         job['status'] = 'failed_retryable';
@@ -952,6 +954,57 @@ class AppState extends ChangeNotifier with LogMixin {
     }
     await source.copy(target.path);
     return target.path;
+  }
+
+  Future<void> _cleanupUploadedQueueFiles(Map<String, Object?> job) async {
+    try {
+      final saleNo = (job['saleNo'] ?? '').toString();
+      if (saleNo.trim().isEmpty) {
+        return;
+      }
+
+      final queueDirectory = await _appDocumentSubDirectory(_uploadQueueFolder);
+      final sessionDirectory = Directory(
+        path.join(queueDirectory.path, 'files', _sanitizePathSegment(saleNo)),
+      );
+      final sessionPath = path.normalize(sessionDirectory.absolute.path);
+      final candidates = <String>[
+        (job['imagePath'] ?? '').toString(),
+        ..._readJobVideoPaths(job),
+      ];
+
+      for (final candidate in candidates) {
+        if (candidate.trim().isEmpty) {
+          continue;
+        }
+        final candidatePath = path.normalize(File(candidate).absolute.path);
+        if (!path.equals(candidatePath, sessionPath) &&
+            !path.isWithin(sessionPath, candidatePath)) {
+          logE('Skip upload cleanup outside queue session: $candidate');
+          continue;
+        }
+        final file = File(candidatePath);
+        if (file.existsSync()) {
+          await file.delete();
+        }
+      }
+
+      if (sessionDirectory.existsSync()) {
+        await sessionDirectory.delete(recursive: true);
+      }
+      job['cleanedAt'] = DateTime.now().toUtc().toIso8601String();
+      logD('Upload queue files cleaned: saleNo=$saleNo');
+    } catch (error, stackTrace) {
+      logE(error, stackTrace: stackTrace);
+    }
+  }
+
+  List<String> _readJobVideoPaths(Map<String, Object?> job) {
+    final rawVideoPaths = job['videoPaths'];
+    if (rawVideoPaths is List) {
+      return rawVideoPaths.map((item) => item.toString()).toList();
+    }
+    return <String>[];
   }
 
   int _fileLength(String filePath) {

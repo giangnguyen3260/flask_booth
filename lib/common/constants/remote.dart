@@ -1,7 +1,7 @@
 import 'dart:io';
 
 const defaultBaseUrl =
-    'https://servers-zoloft-broken-crawford.trycloudflare.com';
+    'https://flashybooth.store';
 
 String resolveBaseUrl() {
   final value = Platform.environment['PTB_BASE_URL'];
