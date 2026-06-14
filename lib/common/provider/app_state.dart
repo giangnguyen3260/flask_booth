@@ -48,6 +48,7 @@ class AppState extends ChangeNotifier with LogMixin {
   AppData appData = const AppData();
   Map<String, dynamic> appConfig = {};
   String kioskCode = '';
+  String kioskSecret = '';
   String remoteApiBaseUrl = '';
   String appVersion = '';
   String currentScreen = 'STANDBY';
@@ -149,6 +150,16 @@ class AppState extends ChangeNotifier with LogMixin {
 
     kioskCode =
         _readConfigValue(kioskConfig, const ["kioskCode", "kiosk_code"]);
+    kioskSecret = _readConfigValue(
+      kioskConfig,
+      const ["kioskSecret", "kiosk_secret", "apiSecret", "api_secret"],
+    );
+    if (kioskSecret.isEmpty) {
+      kioskSecret = _readConfigValue(
+        remoteApiConfig,
+        const ["kioskSecret", "kiosk_secret", "apiSecret", "api_secret"],
+      );
+    }
     cameraMode =
         (Platform.environment['PTB_CAMERA_MODE'] ?? '').trim().isNotEmpty
             ? Platform.environment['PTB_CAMERA_MODE']!.trim()
@@ -188,6 +199,9 @@ class AppState extends ChangeNotifier with LogMixin {
       networkProvider.setBaseUrl(remoteApiBaseUrl);
     } else {
       remoteApiBaseUrl = networkProvider.appDio.options.baseUrl;
+    }
+    if (kioskCode.isNotEmpty && kioskSecret.isNotEmpty) {
+      networkProvider.setKioskCredentials(kioskCode, kioskSecret);
     }
   }
 

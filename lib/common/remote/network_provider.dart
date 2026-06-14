@@ -43,6 +43,19 @@ class NetworkProvider extends AppNetworkProvider {
     }
     appDio.options = appDio.options.copyWith(baseUrl: value.trim());
   }
+
+  void setKioskCredentials(String kioskCode, String kioskSecret) {
+    if (kioskCode.trim().isEmpty || kioskSecret.trim().isEmpty) {
+      return;
+    }
+    appDio.options = appDio.options.copyWith(
+      headers: {
+        ...appDio.options.headers,
+        'X-Kiosk-Code': kioskCode.trim(),
+        'X-Kiosk-Secret': kioskSecret.trim(),
+      },
+    );
+  }
 }
 
 class MyHttpOverrides extends HttpOverrides {
