@@ -58,11 +58,15 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
     notifyListeners();
     logD('Printing export start');
     try {
-      var transparent =
-          appState.imageParam.selectedFrame.getDisplayTransparentAreas(
-        fallbackCount:
-            appState.imageParam.selectedFrame.frameSetting?.numOfPhotos ?? 0,
-      );
+      final bgTransparentAreas =
+          appState.imageParam.selectedBackground.getTransparentAreas();
+      final frameInfo = appState.imageParam.selectedFrame;
+      var transparent = bgTransparentAreas.isNotEmpty
+          ? bgTransparentAreas
+          : frameInfo.getDisplayTransparentAreas(
+              fallbackCount:
+                  frameInfo.frameSetting?.numOfPhotos ?? 0,
+            );
 
       if (transparent.isEmpty) {
         preparationStatus = 'No printable photo slots found';

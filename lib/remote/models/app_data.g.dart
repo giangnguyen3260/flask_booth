@@ -131,6 +131,7 @@ _$BackgroundImpl _$$BackgroundImplFromJson(Map<String, dynamic> json) =>
       bgCd: json['bgCd'] as String?,
       bgNm: json['bgNm'] as String?,
       bgUrl: json['bgUrl'] as String?,
+      transparent: json['transparent'] as String?,
       maskJson: (json['maskJson'] as List<dynamic>?)
           ?.map((e) => BackgroundMaskArea.fromJson(e as Map<String, dynamic>))
           .toList(),
@@ -141,6 +142,7 @@ Map<String, dynamic> _$$BackgroundImplToJson(_$BackgroundImpl instance) =>
       'bgCd': instance.bgCd,
       'bgNm': instance.bgNm,
       'bgUrl': instance.bgUrl,
+      'transparent': instance.transparent,
       'maskJson': instance.maskJson,
     };
 

@@ -185,6 +185,7 @@ class Background with _$Background {
     @JsonKey(name: 'bgCd') String? bgCd,
     @JsonKey(name: 'bgNm') String? bgNm,
     @JsonKey(name: 'bgUrl') String? bgUrl,
+    @JsonKey(name: 'transparent') String? transparent,
     @JsonKey(name: 'maskJson') List<BackgroundMaskArea>? maskJson,
   }) = _Background;
 
@@ -193,6 +194,10 @@ class Background with _$Background {
 
   List<BackgroundMaskArea> getMaskAreas() {
     return maskJson ?? [];
+  }
+
+  List<List<double>> getTransparentAreas() {
+    return StringUtils.parseToListOfListDouble(transparent ?? '');
   }
 }
 

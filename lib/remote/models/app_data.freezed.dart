@@ -1623,6 +1623,8 @@ mixin _$Background {
   String? get bgNm => throw _privateConstructorUsedError;
   @JsonKey(name: 'bgUrl')
   String? get bgUrl => throw _privateConstructorUsedError;
+  @JsonKey(name: 'transparent')
+  String? get transparent => throw _privateConstructorUsedError;
   @JsonKey(name: 'maskJson')
   List<BackgroundMaskArea>? get maskJson => throw _privateConstructorUsedError;
 
@@ -1646,6 +1648,7 @@ abstract class $BackgroundCopyWith<$Res> {
       {@JsonKey(name: 'bgCd') String? bgCd,
       @JsonKey(name: 'bgNm') String? bgNm,
       @JsonKey(name: 'bgUrl') String? bgUrl,
+      @JsonKey(name: 'transparent') String? transparent,
       @JsonKey(name: 'maskJson') List<BackgroundMaskArea>? maskJson});
 }
 
@@ -1667,6 +1670,7 @@ class _$BackgroundCopyWithImpl<$Res, $Val extends Background>
     Object? bgCd = freezed,
     Object? bgNm = freezed,
     Object? bgUrl = freezed,
+    Object? transparent = freezed,
     Object? maskJson = freezed,
   }) {
     return _then(_value.copyWith(
@@ -1681,6 +1685,10 @@ class _$BackgroundCopyWithImpl<$Res, $Val extends Background>
       bgUrl: freezed == bgUrl
           ? _value.bgUrl
           : bgUrl // ignore: cast_nullable_to_non_nullable
+              as String?,
+      transparent: freezed == transparent
+          ? _value.transparent
+          : transparent // ignore: cast_nullable_to_non_nullable
               as String?,
       maskJson: freezed == maskJson
           ? _value.maskJson
@@ -1702,6 +1710,7 @@ abstract class _$$BackgroundImplCopyWith<$Res>
       {@JsonKey(name: 'bgCd') String? bgCd,
       @JsonKey(name: 'bgNm') String? bgNm,
       @JsonKey(name: 'bgUrl') String? bgUrl,
+      @JsonKey(name: 'transparent') String? transparent,
       @JsonKey(name: 'maskJson') List<BackgroundMaskArea>? maskJson});
 }
 
@@ -1721,6 +1730,7 @@ class __$$BackgroundImplCopyWithImpl<$Res>
     Object? bgCd = freezed,
     Object? bgNm = freezed,
     Object? bgUrl = freezed,
+    Object? transparent = freezed,
     Object? maskJson = freezed,
   }) {
     return _then(_$BackgroundImpl(
@@ -1735,6 +1745,10 @@ class __$$BackgroundImplCopyWithImpl<$Res>
       bgUrl: freezed == bgUrl
           ? _value.bgUrl
           : bgUrl // ignore: cast_nullable_to_non_nullable
+              as String?,
+      transparent: freezed == transparent
+          ? _value.transparent
+          : transparent // ignore: cast_nullable_to_non_nullable
               as String?,
       maskJson: freezed == maskJson
           ? _value._maskJson
@@ -1751,6 +1765,7 @@ class _$BackgroundImpl extends _Background {
       {@JsonKey(name: 'bgCd') this.bgCd,
       @JsonKey(name: 'bgNm') this.bgNm,
       @JsonKey(name: 'bgUrl') this.bgUrl,
+      @JsonKey(name: 'transparent') this.transparent,
       @JsonKey(name: 'maskJson') final List<BackgroundMaskArea>? maskJson})
       : _maskJson = maskJson,
         super._();
@@ -1767,6 +1782,9 @@ class _$BackgroundImpl extends _Background {
   @override
   @JsonKey(name: 'bgUrl')
   final String? bgUrl;
+  @override
+  @JsonKey(name: 'transparent')
+  final String? transparent;
   final List<BackgroundMaskArea>? _maskJson;
   @override
   @JsonKey(name: 'maskJson')
@@ -1780,7 +1798,7 @@ class _$BackgroundImpl extends _Background {
 
   @override
   String toString() {
-    return 'Background(bgCd: $bgCd, bgNm: $bgNm, bgUrl: $bgUrl, maskJson: $maskJson)';
+    return 'Background(bgCd: $bgCd, bgNm: $bgNm, bgUrl: $bgUrl, transparent: $transparent, maskJson: $maskJson)';
   }
 
   @override
@@ -1791,12 +1809,14 @@ class _$BackgroundImpl extends _Background {
             (identical(other.bgCd, bgCd) || other.bgCd == bgCd) &&
             (identical(other.bgNm, bgNm) || other.bgNm == bgNm) &&
             (identical(other.bgUrl, bgUrl) || other.bgUrl == bgUrl) &&
+            (identical(other.transparent, transparent) ||
+                other.transparent == transparent) &&
             const DeepCollectionEquality().equals(other._maskJson, _maskJson));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  int get hashCode => Object.hash(runtimeType, bgCd, bgNm, bgUrl,
+  int get hashCode => Object.hash(runtimeType, bgCd, bgNm, bgUrl, transparent,
       const DeepCollectionEquality().hash(_maskJson));
 
   /// Create a copy of Background
@@ -1820,6 +1840,7 @@ abstract class _Background extends Background {
       {@JsonKey(name: 'bgCd') final String? bgCd,
       @JsonKey(name: 'bgNm') final String? bgNm,
       @JsonKey(name: 'bgUrl') final String? bgUrl,
+      @JsonKey(name: 'transparent') final String? transparent,
       @JsonKey(name: 'maskJson')
       final List<BackgroundMaskArea>? maskJson}) = _$BackgroundImpl;
   const _Background._() : super._();
@@ -1836,6 +1857,9 @@ abstract class _Background extends Background {
   @override
   @JsonKey(name: 'bgUrl')
   String? get bgUrl;
+  @override
+  @JsonKey(name: 'transparent')
+  String? get transparent;
   @override
   @JsonKey(name: 'maskJson')
   List<BackgroundMaskArea>? get maskJson;
