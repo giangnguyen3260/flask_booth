@@ -49,6 +49,10 @@ class AppState extends ChangeNotifier with LogMixin {
   Map<String, dynamic> appConfig = {};
   String kioskCode = '';
   String kioskSecret = '';
+  bool _printerConnected = true;
+  String? _printerErrorCode;
+  String _printerCode = '';
+  String _printerName = '';
   String remoteApiBaseUrl = '';
   String appVersion = '';
   String currentScreen = 'STANDBY';
@@ -97,6 +101,7 @@ class AppState extends ChangeNotifier with LogMixin {
       isInitSuccess = true;
       notifyListeners();
       _startHeartbeat();
+      async.unawaited(sendPrinterStatusReport());
     } catch (e, stackTrace) {
       logE(e, stackTrace: stackTrace);
       isInitSuccess = false;
@@ -199,6 +204,21 @@ class AppState extends ChangeNotifier with LogMixin {
       networkProvider.setBaseUrl(remoteApiBaseUrl);
     } else {
       remoteApiBaseUrl = networkProvider.appDio.options.baseUrl;
+    }
+    final printerConfig = _readConfigSection("printer");
+    _printerCode = _readConfigValue(
+      printerConfig,
+      const ["printerCode", "printer_code"],
+    );
+    _printerName = _readConfigValue(
+      printerConfig,
+      const ["name", "printerName", "printer_name"],
+    );
+    if (_printerCode.isEmpty && kioskCode.isNotEmpty) {
+      _printerCode = '$kioskCode-P1';
+    }
+    if (_printerName.isEmpty && kioskCode.isNotEmpty) {
+      _printerName = kioskCode;
     }
     if (kioskCode.isNotEmpty && kioskSecret.isNotEmpty) {
       networkProvider.setKioskCredentials(kioskCode, kioskSecret);
@@ -652,6 +672,14 @@ class AppState extends ChangeNotifier with LogMixin {
     notifyListeners();
   }
 
+  void updatePrinterConnectionStatus({
+    required bool connected,
+    String? errorCode,
+  }) {
+    _printerConnected = connected;
+    _printerErrorCode = connected ? null : errorCode;
+  }
+
   bool get isMockCameraMode => cameraMode.toLowerCase() == 'mock';
 
   bool get isMockPaymentMode =>
@@ -726,6 +754,40 @@ class AppState extends ChangeNotifier with LogMixin {
     } catch (e, stackTrace) {
       logE(e, stackTrace: stackTrace);
     }
+  }
+
+  Future<void> sendPrinterStatusReport() async {
+    if (kioskCode.isEmpty || _printerCode.isEmpty) return;
+    try {
+      final status = _mapPrinterStatus(
+        connected: _printerConnected,
+        errorCode: _printerErrorCode,
+      );
+      await restClient.reportPrinterStatus({
+        'printers': [
+          {
+            'printerCode': _printerCode,
+            'name': _printerName,
+            'status': status,
+            'paperPercent': 0,
+            'inkPercent': 0,
+            'printedCount': 0,
+            'metadata': <String, Object?>{},
+          }
+        ],
+      });
+    } catch (e, stackTrace) {
+      logE(e, stackTrace: stackTrace);
+    }
+  }
+
+  String _mapPrinterStatus({
+    required bool connected,
+    String? errorCode,
+  }) {
+    if (!connected) return 'OFFLINE';
+    if (errorCode != null && errorCode.isNotEmpty) return 'CRITICAL';
+    return 'ONLINE';
   }
 
   String getGuideText() {
