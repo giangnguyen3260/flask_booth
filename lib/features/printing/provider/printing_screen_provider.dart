@@ -241,8 +241,15 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
         logD(
           'Printing print job done: queued=$printQueued copies=$printCopies',
         );
+        appState.updatePrinterConnectionStatus(connected: true);
+        appState.sendPrinterStatusReport();
       } catch (error, stackTrace) {
         logE(error, stackTrace: stackTrace);
+        appState.updatePrinterConnectionStatus(
+          connected: false,
+          errorCode: 'PRINT_FAILED',
+        );
+        appState.sendPrinterStatusReport();
       }
       preparationStatus = isUploadQueued ? 'Waiting to upload when online' : '';
       notifyListeners();
