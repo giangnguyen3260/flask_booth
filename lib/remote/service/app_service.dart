@@ -6,6 +6,7 @@ import 'package:project_l/remote/models/coupon_detail.dart';
 import 'package:project_l/remote/models/kiosk_event_response.dart';
 import 'package:project_l/remote/models/kiosk_heartbeat_response.dart';
 import 'package:project_l/remote/models/main_info_version.dart';
+import 'package:project_l/remote/models/printer_status_response.dart';
 import 'package:project_l/remote/models/qr_detail.dart';
 import 'package:retrofit/retrofit.dart';
 
@@ -50,4 +51,9 @@ abstract class RestClient {
     @Part(name: "amount") required double amount,
     @Part(name: "printQuantity") required int printQuantity,
   });
+
+  @POST('/pub/printers/status')
+  Future<PrinterStatusResponse> reportPrinterStatus(
+    @Body() Map<String, Object?> request,
+  );
 }
