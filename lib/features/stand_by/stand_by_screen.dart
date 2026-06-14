@@ -35,11 +35,13 @@ class _StandByScreenState
     super.initState();
     unawaited(appState.checkForAdminDataUpdate(force: true));
     unawaited(appState.retryPendingUploads());
+    unawaited(appState.sendPrinterStatusReport());
     _adminUpdateCheckTimer = Timer.periodic(
       AppState.adminUpdateCheckInterval,
       (_) {
         unawaited(appState.checkForAdminDataUpdate());
         unawaited(appState.retryPendingUploads());
+        unawaited(appState.sendPrinterStatusReport());
       },
     );
   }
