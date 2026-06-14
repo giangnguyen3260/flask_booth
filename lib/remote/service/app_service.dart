@@ -5,6 +5,7 @@ import 'package:project_l/remote/models/app_data.dart';
 import 'package:project_l/remote/models/coupon_detail.dart';
 import 'package:project_l/remote/models/kiosk_event_response.dart';
 import 'package:project_l/remote/models/kiosk_heartbeat_response.dart';
+import 'package:project_l/remote/models/main_info_version.dart';
 import 'package:project_l/remote/models/qr_detail.dart';
 import 'package:retrofit/retrofit.dart';
 
@@ -19,6 +20,9 @@ abstract class RestClient {
 
   @GET('/pub/main-info')
   Future<AppData> initData();
+
+  @GET('/pub/main-info/version')
+  Future<MainInfoVersion> fetchMainInfoVersion();
 
   @POST('/pub/kiosks/{kioskCode}/heartbeat')
   Future<KioskHeartbeatResponse> sendHeartbeat(

@@ -421,10 +421,8 @@ class AppState extends ChangeNotifier with LogMixin {
     isCheckingAdminUpdate = true;
     notifyListeners();
     try {
-      final response =
-          await networkProvider.appDio.get('/pub/main-info/version');
-      final data = response.data;
-      final version = _readVersionValue(data);
+      final result = await restClient.fetchMainInfoVersion();
+      final version = result.version?.toString().trim() ?? '';
       if (version.isNotEmpty) {
         latestAdminDataVersion = version;
         hasPendingAdminUpdate =
