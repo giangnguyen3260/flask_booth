@@ -8,7 +8,7 @@ import '../constants/network_constants.dart';
 import 'app_network_provider.dart';
 import 'network_interceptor.dart';
 
-@Injectable()
+@singleton
 class NetworkProvider extends AppNetworkProvider {
   final NetworkInterceptor networkInterceptor;
 

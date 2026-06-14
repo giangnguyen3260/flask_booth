@@ -194,12 +194,12 @@ class AppState extends ChangeNotifier with LogMixin {
       remoteApiBaseUrl =
           appBaseUrl.isNotEmpty ? appBaseUrl : serverConfigBaseUrl;
     }
-    _hasConfiguredRemoteApi = remoteApiBaseUrl.isNotEmpty;
     if (remoteApiBaseUrl.isEmpty &&
         !kReleaseMode &&
         (Platform.isMacOS || Platform.isWindows || Platform.isLinux)) {
-      remoteApiBaseUrl = 'http://127.0.0.1:8080';
+      remoteApiBaseUrl = 'http://192.168.1.96:8080';
     }
+    _hasConfiguredRemoteApi = remoteApiBaseUrl.isNotEmpty;
     if (remoteApiBaseUrl.isNotEmpty) {
       networkProvider.setBaseUrl(remoteApiBaseUrl);
     } else {
