@@ -879,14 +879,6 @@ class AppState extends ChangeNotifier with LogMixin {
     return version == null ? '' : version.toString();
   }
 
-  String _readVersionValue(Object? data) {
-    if (data is Map) {
-      final version = data['version'] ?? data['configVersion'];
-      return version?.toString().trim() ?? '';
-    }
-    return '';
-  }
-
   bool _isDifferentVersion(String latestVersion, String activeVersion) {
     if (latestVersion.trim().isEmpty || activeVersion.trim().isEmpty) {
       return false;
