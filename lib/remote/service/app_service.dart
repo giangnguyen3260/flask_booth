@@ -4,6 +4,7 @@ import 'package:project_l/common/remote/network_provider.dart';
 import 'package:project_l/remote/models/app_data.dart';
 import 'package:project_l/remote/models/coupon_detail.dart';
 import 'package:project_l/remote/models/kiosk_event_response.dart';
+import 'package:project_l/remote/models/kiosk_command.dart';
 import 'package:project_l/remote/models/kiosk_heartbeat_response.dart';
 import 'package:project_l/remote/models/main_info_version.dart';
 import 'package:project_l/remote/models/printer_status_response.dart';
@@ -55,5 +56,17 @@ abstract class RestClient {
   @POST('/pub/printers/status')
   Future<PrinterStatusResponse> reportPrinterStatus(
     @Body() Map<String, Object?> request,
+  );
+
+  @GET('/pub/kiosks/{kioskCode}/commands')
+  Future<List<KioskCommand>> fetchPendingCommands(
+    @Path() String kioskCode,
+  );
+
+  @POST('/pub/kiosks/{kioskCode}/commands/{commandId}/ack')
+  Future<void> acknowledgeCommand(
+    @Path() String kioskCode,
+    @Path() String commandId,
+    @Body() Map<String, Object?> body,
   );
 }
