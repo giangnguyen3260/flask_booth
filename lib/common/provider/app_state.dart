@@ -65,6 +65,7 @@ class AppState extends ChangeNotifier with LogMixin {
   final CameraPowerUtil cameraPowerUtil = getIt.get();
   final CameraUtils cameraUtils = getIt.get();
   async.Timer? _heartbeatTimer;
+  bool _isExecutingPrintCommand = false;
   String activeAdminDataVersion = '';
   String latestAdminDataVersion = '';
   bool hasPendingAdminUpdate = false;
@@ -747,6 +748,8 @@ class AppState extends ChangeNotifier with LogMixin {
 
   Future<void> checkAndExecutePendingCommands() async {
     if (kioskCode.isEmpty || currentScreen != 'STANDBY') return;
+    if (_isExecutingPrintCommand) return;
+    _isExecutingPrintCommand = true;
     try {
       final commands = await restClient.fetchPendingCommands(kioskCode);
       for (final command in commands) {
@@ -755,6 +758,8 @@ class AppState extends ChangeNotifier with LogMixin {
       }
     } catch (e, stackTrace) {
       logE(e, stackTrace: stackTrace);
+    } finally {
+      _isExecutingPrintCommand = false;
     }
   }
 
