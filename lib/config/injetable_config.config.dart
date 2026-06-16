@@ -108,6 +108,7 @@ extension GetItInjectableX on _i174.GetIt {
           restClient: gh<_i81.RestClient>(),
           remoteImageUtils: gh<_i1016.RemoteImageUtils>(),
           networkProvider: gh<_i151.NetworkProvider>(),
+          printerUtils: gh<_i644.PrinterUtils>(),
         ));
     return this;
   }

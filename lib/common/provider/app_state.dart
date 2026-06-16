@@ -19,8 +19,11 @@ import 'package:project_l/common/remote/network_provider.dart';
 import 'package:project_l/common/util/bill_acceptor_utils.dart';
 import 'package:project_l/common/util/camera_power_util.dart';
 import 'package:project_l/common/util/camera_utils.dart';
+import 'package:project_l/common/extensions/size_extension.dart';
 import 'package:project_l/common/util/background_mask_utils.dart';
+import 'package:project_l/common/util/printer_utils.dart';
 import 'package:project_l/common/util/remote_image_utils.dart';
+import 'package:project_l/remote/models/kiosk_command.dart';
 import 'package:project_l/config/injetable_config.dart';
 import 'package:project_l/common/models/app_theme_config.dart';
 import 'package:project_l/remote/models/app_data.dart';
@@ -68,11 +71,14 @@ class AppState extends ChangeNotifier with LogMixin {
   bool isCheckingAdminUpdate = false;
   DateTime? lastAdminUpdateCheckAt;
 
+  final PrinterUtils _printerUtils;
+
   AppState({
     required this.restClient,
     required this.remoteImageUtils,
     required this.networkProvider,
-  });
+    required PrinterUtils printerUtils,
+  }) : _printerUtils = printerUtils;
 
   bool isInitSuccess = false;
 
@@ -268,11 +274,10 @@ class AppState extends ChangeNotifier with LogMixin {
     for (FramesInfo frameInfo in remoteData.framesInfo ?? []) {
       var tempFramePath = await _resolveImagePath(frameInfo.frameUrlTempDis);
       var mainFramePath = await _resolveImagePath(frameInfo.frameUrl);
-      if (tempFramePath.isEmpty && mainFramePath.isEmpty) continue;
 
       frameInfo = frameInfo.copyWith(
         frameUrlTempDis: tempFramePath.isNotEmpty ? tempFramePath : null,
-        frameUrl: mainFramePath.isNotEmpty ? mainFramePath : tempFramePath,
+        frameUrl: mainFramePath.isNotEmpty ? mainFramePath : (tempFramePath.isNotEmpty ? tempFramePath : null),
       );
       List<BackgroundInfo> tempBackgroundInfo = [];
       for (BackgroundInfo backgroundCategory
@@ -300,7 +305,12 @@ class AppState extends ChangeNotifier with LogMixin {
             backgroundCategory.copyWith(background: tempBackground);
         tempBackgroundInfo.add(backgroundCategory);
       }
-      tempData.add(frameInfo.copyWith(backgroundInfo: tempBackgroundInfo));
+      // Include frame if it has at least one usable background, even without a frame overlay image
+      final hasUsableBackgrounds = tempBackgroundInfo
+          .any((cat) => (cat.background ?? []).isNotEmpty);
+      if (hasUsableBackgrounds || frameInfo.frameUrl != null) {
+        tempData.add(frameInfo.copyWith(backgroundInfo: tempBackgroundInfo));
+      }
     }
     if (tempData.isEmpty && (remoteData.framesInfo ?? []).isNotEmpty) {
       throw StateError('No usable frame assets were resolved from admin data');
@@ -713,7 +723,7 @@ class AppState extends ChangeNotifier with LogMixin {
       return;
     }
     try {
-      await restClient.sendHeartbeat(
+      final response = await restClient.sendHeartbeat(
         kioskCode,
         {
           "appVersion": appVersion,
@@ -726,8 +736,79 @@ class AppState extends ChangeNotifier with LogMixin {
           },
         },
       );
+      final pending = response.pendingCommands ?? 0;
+      if (pending > 0 && currentScreen == 'STANDBY') {
+        async.unawaited(checkAndExecutePendingCommands());
+      }
     } catch (e, stackTrace) {
       logE(e, stackTrace: stackTrace);
+    }
+  }
+
+  Future<void> checkAndExecutePendingCommands() async {
+    if (kioskCode.isEmpty || currentScreen != 'STANDBY') return;
+    try {
+      final commands = await restClient.fetchPendingCommands(kioskCode);
+      for (final command in commands) {
+        if ((command.commandType ?? '').toUpperCase() != 'PRINT') continue;
+        await _executePrintCommand(command);
+      }
+    } catch (e, stackTrace) {
+      logE(e, stackTrace: stackTrace);
+    }
+  }
+
+  Future<void> _executePrintCommand(KioskCommand command) async {
+    final commandId = command.commandId ?? '';
+    final payload = command.payload;
+    final imageUrl = payload?.imageUrl ?? '';
+    if (commandId.isEmpty || imageUrl.isEmpty) return;
+
+    logD('AutoPrint executing commandId=$commandId imageUrl=$imageUrl');
+    try {
+      final fileName = 'autoprint_${commandId}_${imageUrl.split('/').last}';
+      final localPath = await remoteImageUtils.downloadAndSaveFile(imageUrl, fileName);
+      if (localPath.isEmpty || !File(localPath).existsSync()) {
+        throw StateError('AutoPrint download failed: $imageUrl');
+      }
+
+      final isCut = payload?.isCut ?? false;
+      final quantity = payload?.printQuantity ?? 1;
+      final copies = isCut ? (quantity / 2).ceil() : quantity;
+
+      final orientationStr = (payload?.orientation ?? '').toLowerCase();
+      final sizeForOrientation = orientationStr == 'landscape'
+          ? const Size(2, 1)
+          : const Size(1, 2);
+
+      await _printerUtils
+          .printImage(
+            file: File(localPath),
+            numCut: copies < 1 ? 1 : copies,
+            orientation: sizeForOrientation.orientation,
+          )
+          .timeout(const Duration(seconds: 45));
+
+      logD('AutoPrint done commandId=$commandId');
+      updatePrinterConnectionStatus(connected: true);
+
+      await restClient.acknowledgeCommand(
+        kioskCode,
+        commandId,
+        {'status': 'COMPLETED'},
+      );
+    } catch (e, stackTrace) {
+      logE(e, stackTrace: stackTrace);
+      updatePrinterConnectionStatus(connected: false, errorCode: 'AUTO_PRINT_FAILED');
+      try {
+        await restClient.acknowledgeCommand(
+          kioskCode,
+          commandId,
+          {'status': 'FAILED', 'error': e.toString()},
+        );
+      } catch (_) {}
+    } finally {
+      async.unawaited(sendPrinterStatusReport());
     }
   }
 
