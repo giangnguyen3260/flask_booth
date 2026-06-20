@@ -1,6 +1,7 @@
 ﻿import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
@@ -32,16 +33,17 @@ class _BackgroundSelectionScreenState extends BasePageState<
     BackgroundSelectionListenState,
     BackgroundSelectionProvider,
     BackgroundSelectionScreen> with LogMixin {
-  late final List<List<double>> _transparentAreas =
-      appState.imageParam.selectedFrame.getDisplayTransparentAreas(
-    fallbackCount:
-        appState.imageParam.selectedFrame.frameSetting?.numOfPhotos ?? 0,
-  );
+  Size _backgroundSize = const Size(1, 1);
+  String _lastLoadedBgPath = '';
 
-  late final Size _backgroundSize = Size(
-    appState.imageParam.selectedFrame.getSize().$1,
-    appState.imageParam.selectedFrame.getSize().$2,
-  );
+  List<List<double>> get _effectiveTransparentAreas {
+    final bgAreas = _selectedBackground?.getTransparentAreas() ?? [];
+    if (bgAreas.isNotEmpty) return bgAreas;
+    return appState.imageParam.selectedFrame.getDisplayTransparentAreas(
+      fallbackCount:
+          appState.imageParam.selectedFrame.frameSetting?.numOfPhotos ?? 0,
+    );
+  }
 
   final FrameOverlayMaskUtils _frameOverlayMaskUtils = FrameOverlayMaskUtils();
   String _frameOverlaySourcePath = '';
@@ -157,7 +159,7 @@ class _BackgroundSelectionScreenState extends BasePageState<
     _maskedFrameOverlayPath = _frameOverlaySourcePath;
     provider.initPreset();
     logD(
-      'PERF BackgroundSelection.afterFirstBuild init frame=${appState.imageParam.selectedFrame.frameCd} images=${appState.imageParam.images.length} transparent=${_transparentAreas.length} backgroundCategories=${_backgroundInfo.length} elapsed=${stopwatch.elapsedMilliseconds}ms',
+      'PERF BackgroundSelection.afterFirstBuild init frame=${appState.imageParam.selectedFrame.frameCd} images=${appState.imageParam.images.length} transparent=${_effectiveTransparentAreas.length} backgroundCategories=${_backgroundInfo.length} elapsed=${stopwatch.elapsedMilliseconds}ms',
     );
     if (_displayBackgroundInfo.isNotEmpty) {
       provider.changeCurrentCategoryIndex(0);
@@ -174,8 +176,28 @@ class _BackgroundSelectionScreenState extends BasePageState<
         'PERF BackgroundSelection.mask start elapsed=${stopwatch.elapsedMilliseconds}ms source=$_frameOverlaySourcePath',
       );
       unawaited(_prepareMaskedFrameOverlay());
+      unawaited(_loadBackgroundSize(_selectedBackground?.bgUrl ?? ''));
     });
     super.afterFirstBuild();
+  }
+
+  Future<void> _loadBackgroundSize(String bgPath) async {
+    if (bgPath.isEmpty || bgPath == _lastLoadedBgPath) return;
+    if (!File(bgPath).existsSync()) return;
+    try {
+      final bytes = await File(bgPath).readAsBytes();
+      final codec = await ui.instantiateImageCodec(bytes);
+      final frame = await codec.getNextFrame();
+      final w = frame.image.width.toDouble();
+      final h = frame.image.height.toDouble();
+      frame.image.dispose();
+      if (mounted && w > 1 && h > 1) {
+        setState(() {
+          _backgroundSize = Size(w, h);
+          _lastLoadedBgPath = bgPath;
+        });
+      }
+    } catch (_) {}
   }
 
   @override
@@ -191,14 +213,18 @@ class _BackgroundSelectionScreenState extends BasePageState<
   @override
   Widget buildPage(BuildContext context, maxWidth, maxHeight) {
     final buildStopwatch = Stopwatch()..start();
-    final frameOverlayPath = _resolveBackgroundPath(
-      _resolvedFrameOverlayDisplayPath,
-    );
     final sceneBackgroundPath = _resolveBackgroundPath(
       (_selectedBackground?.bgUrl ?? '').isNotEmpty
           ? (_selectedBackground?.bgUrl ?? '')
           : _resolvedFrameOverlaySourcePath,
     );
+    if (sceneBackgroundPath != _lastLoadedBgPath &&
+        sceneBackgroundPath.isNotEmpty &&
+        !sceneBackgroundPath.startsWith('assets/')) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) unawaited(_loadBackgroundSize(sceneBackgroundPath));
+      });
+    }
     if (!_didLogFirstFrame) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) {
@@ -206,7 +232,7 @@ class _BackgroundSelectionScreenState extends BasePageState<
         }
         _didLogFirstFrame = true;
         logD(
-          'PERF BackgroundSelection.firstFrame elapsed=${buildStopwatch.elapsedMilliseconds}ms frameOverlayExists=${File(frameOverlayPath).existsSync()} backgroundExists=${File(sceneBackgroundPath).existsSync()}',
+          'PERF BackgroundSelection.firstFrame elapsed=${buildStopwatch.elapsedMilliseconds}ms backgroundExists=${File(sceneBackgroundPath).existsSync()}',
         );
       });
     }
@@ -237,7 +263,6 @@ class _BackgroundSelectionScreenState extends BasePageState<
                     Expanded(
                       child: Center(
                         child: _buildFramePreview(
-                          frameOverlayPath: frameOverlayPath,
                           sceneBackgroundPath: sceneBackgroundPath,
                         ),
                       ),
@@ -629,7 +654,6 @@ class _BackgroundSelectionScreenState extends BasePageState<
   }
 
   Widget _buildFramePreview({
-    required String frameOverlayPath,
     required String sceneBackgroundPath,
   }) {
     final aspectRatio = _backgroundSize.width / _backgroundSize.height;
@@ -669,12 +693,9 @@ class _BackgroundSelectionScreenState extends BasePageState<
                   child: _buildPhotoLayer(),
                 ),
                 Positioned.fill(
-                  child: Image.file(
-                    File(frameOverlayPath),
-                    key: ValueKey(frameOverlayPath),
-                    fit: BoxFit.contain,
-                    filterQuality: FilterQuality.high,
-                    gaplessPlayback: true,
+                  child: _buildImageFromPath(
+                    sceneBackgroundPath,
+                    key: ValueKey('bg_top_$sceneBackgroundPath'),
                   ),
                 ),
               ],
@@ -685,33 +706,26 @@ class _BackgroundSelectionScreenState extends BasePageState<
     );
   }
 
-  Widget _buildBackgroundLayer(String sceneBackgroundPath) {
-    return LayoutBuilder(
-      builder: (context, constraint) {
-        final render = _resolveRenderMetrics(
-          Size(constraint.maxWidth, constraint.maxHeight),
-        );
-        final holeRects = List<Rect>.generate(
-          _transparentAreas.length,
-          (i) => Rect.fromLTWH(
-            render.offsetX + _transparentAreas[i][0] * render.scaleWidth,
-            render.offsetY + _transparentAreas[i][1] * render.scaleHeight,
-            _transparentAreas[i][2] * render.scaleWidth,
-            _transparentAreas[i][3] * render.scaleHeight,
-          ),
-        );
-        return ClipPath(
-          clipper: _TransparentHolesClipper(holeRects: holeRects),
-          child: Image.file(
-            File(sceneBackgroundPath),
-            key: ValueKey(sceneBackgroundPath),
-            fit: BoxFit.contain,
-            filterQuality: FilterQuality.high,
-            gaplessPlayback: true,
-          ),
-        );
-      },
+  Widget _buildImageFromPath(String imagePath, {Key? key}) {
+    if (imagePath.startsWith('assets/')) {
+      return Image.asset(
+        imagePath,
+        key: key,
+        fit: BoxFit.contain,
+        filterQuality: FilterQuality.high,
+      );
+    }
+    return Image.file(
+      File(imagePath),
+      key: key,
+      fit: BoxFit.contain,
+      filterQuality: FilterQuality.high,
+      gaplessPlayback: true,
     );
+  }
+
+  Widget _buildBackgroundLayer(String sceneBackgroundPath) {
+    return _buildImageFromPath(sceneBackgroundPath, key: ValueKey(sceneBackgroundPath));
   }
 
   Widget _buildPhotoLayer() {
@@ -720,22 +734,21 @@ class _BackgroundSelectionScreenState extends BasePageState<
         final render = _resolveRenderMetrics(
           Size(constraint.maxWidth, constraint.maxHeight),
         );
+        final areas = _effectiveTransparentAreas;
         final slotCount = math.min(
-          _transparentAreas.length,
+          areas.length,
           appState.imageParam.images.length,
         );
         return Stack(
           children: List.generate(slotCount, (i) {
             final imagePath = appState.imageParam.images[i];
-            final width = _transparentAreas[i][2] * render.scaleWidth;
-            final height = _transparentAreas[i][3] * render.scaleHeight;
+            final width = areas[i][2] * render.scaleWidth;
+            final height = areas[i][3] * render.scaleHeight;
             _innerTransparentSize = Size(width, height);
 
             return Positioned(
-              left:
-                  render.offsetX + _transparentAreas[i][0] * render.scaleWidth,
-              top:
-                  render.offsetY + _transparentAreas[i][1] * render.scaleHeight,
+              left: render.offsetX + areas[i][0] * render.scaleWidth,
+              top: render.offsetY + areas[i][1] * render.scaleHeight,
               width: width,
               height: height,
               child: imagePath.isEmpty
@@ -1389,33 +1402,4 @@ class _RenderMetrics {
   final double offsetY;
   final double scaleWidth;
   final double scaleHeight;
-}
-
-class _TransparentHolesClipper extends CustomClipper<Path> {
-  const _TransparentHolesClipper({required this.holeRects});
-
-  final List<Rect> holeRects;
-
-  @override
-  Path getClip(Size size) {
-    final path = Path()..fillType = PathFillType.evenOdd;
-    path.addRect(Offset.zero & size);
-    for (final rect in holeRects) {
-      path.addRect(rect);
-    }
-    return path;
-  }
-
-  @override
-  bool shouldReclip(covariant _TransparentHolesClipper oldClipper) {
-    if (oldClipper.holeRects.length != holeRects.length) {
-      return true;
-    }
-    for (var i = 0; i < holeRects.length; i++) {
-      if (oldClipper.holeRects[i] != holeRects[i]) {
-        return true;
-      }
-    }
-    return false;
-  }
 }
