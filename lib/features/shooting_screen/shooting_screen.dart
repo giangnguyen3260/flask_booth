@@ -609,6 +609,15 @@ class _ShootingScreenState extends BasePageState<ShootingScreenListenState,
                                   ? capturedPreviewPath
                                   : null,
                             ),
+                            Positioned(
+                              bottom: 20.h,
+                              left: 0,
+                              right: 0,
+                              child: _CapturedPhotoStrip(
+                                images: provider.uiImages,
+                                totalShots: shotCount,
+                              ),
+                            ),
                             Positioned.fill(
                               child: ListenableBuilder(
                                 builder: (context, _) {
@@ -1263,6 +1272,72 @@ class ShutterEffect extends StatefulWidget {
 
   @override
   State<ShutterEffect> createState() => _ShutterEffectState();
+}
+
+class _CapturedPhotoStrip extends StatelessWidget {
+  const _CapturedPhotoStrip({
+    required this.images,
+    required this.totalShots,
+  });
+
+  final List<String> images;
+  final int totalShots;
+
+  @override
+  Widget build(BuildContext context) {
+    final thumbSize = 64.w;
+    final gap = 8.w;
+    return Center(
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        physics: const NeverScrollableScrollPhysics(),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: List.generate(totalShots, (i) {
+            final hasImage =
+                i < images.length && images[i].isNotEmpty && File(images[i]).existsSync();
+            return Padding(
+              padding: EdgeInsets.symmetric(horizontal: gap / 2),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(6.r),
+                child: SizedBox(
+                  width: thumbSize,
+                  height: thumbSize,
+                  child: hasImage
+                      ? Image.file(
+                          File(images[i]),
+                          key: ValueKey(images[i]),
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) =>
+                              _emptyThumb(i, thumbSize),
+                        )
+                      : _emptyThumb(i, thumbSize),
+                ),
+              ),
+            );
+          }),
+        ),
+      ),
+    );
+  }
+
+  Widget _emptyThumb(int index, double size) {
+    return ColoredBox(
+      color: Colors.white.withValues(alpha: 0.12),
+      child: Center(
+        child: Text(
+          '${index + 1}',
+          style: TextStyle(
+            fontFamily: 'Lexend',
+            fontSize: 16.sp,
+            fontWeight: FontWeight.w700,
+            color: Colors.white.withValues(alpha: 0.35),
+            height: 1,
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _ShutterEffectState extends State<ShutterEffect>
