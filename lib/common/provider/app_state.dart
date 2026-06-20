@@ -845,6 +845,7 @@ class AppState extends ChangeNotifier with LogMixin {
   Future<void> sendPrinterStatusReport() async {
     if (kioskCode.isEmpty || _printerCode.isEmpty) return;
     try {
+      final printerHardwareStatus = await _printerUtils.getPrinterStatus();
       final status = _mapPrinterStatus(
         connected: _printerConnected,
         errorCode: _printerErrorCode,
@@ -855,9 +856,9 @@ class AppState extends ChangeNotifier with LogMixin {
             'printerCode': _printerCode,
             'name': _printerName,
             'status': status,
-            'paperPercent': 0,
-            'inkPercent': 0,
-            'printedCount': 0,
+            'paperPercent': printerHardwareStatus.paperPercent,
+            'inkPercent': printerHardwareStatus.inkPercent,
+            'printedCount': _printerUtils.printedCount,
             'metadata': <String, Object?>{},
           }
         ],

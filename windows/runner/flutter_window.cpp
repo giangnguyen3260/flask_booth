@@ -74,6 +74,54 @@ std::vector <JobInfo> GetPrintJobQueue(LPCWSTR printerName) {
     return jobs;
 }
 
+PrinterStatusInfo GetPrinterDeviceStatus(LPCWSTR printerName) {
+    PrinterStatusInfo info = {0, 100, 100}; // default: assume OK
+    HANDLE hPrinter;
+    PRINTER_DEFAULTS pd = {NULL, NULL, PRINTER_ACCESS_USE};
+    if (!OpenPrinter((LPWSTR) printerName, &hPrinter, &pd)) {
+        info.paperPercent = -1;
+        info.inkPercent = -1;
+        return info;
+    }
+    DWORD needed = 0;
+    GetPrinter(hPrinter, 2, NULL, 0, &needed);
+    if (needed == 0) {
+        ClosePrinter(hPrinter);
+        info.paperPercent = -1;
+        info.inkPercent = -1;
+        return info;
+    }
+    PRINTER_INFO_2 *pInfo = (PRINTER_INFO_2 *) malloc(needed);
+    if (!pInfo) {
+        ClosePrinter(hPrinter);
+        info.paperPercent = -1;
+        info.inkPercent = -1;
+        return info;
+    }
+    DWORD returned = 0;
+    if (GetPrinter(hPrinter, 2, (LPBYTE) pInfo, needed, &returned)) {
+        info.status = pInfo->Status;
+        // Paper: DS-RX1 driver maps paper-out to these flags
+        if ((pInfo->Status & PRINTER_STATUS_PAPER_OUT) ||
+            (pInfo->Status & PRINTER_STATUS_PAPER_PROBLEM) ||
+            (pInfo->Status & PRINTER_STATUS_PAPER_JAM)) {
+            info.paperPercent = 0;
+        }
+        // Ink/ribbon: DS-RX1 driver maps ribbon status to toner flags
+        if (pInfo->Status & PRINTER_STATUS_NO_TONER) {
+            info.inkPercent = 0;
+        } else if (pInfo->Status & PRINTER_STATUS_TONER_LOW) {
+            info.inkPercent = 10;
+        }
+    } else {
+        info.paperPercent = -1;
+        info.inkPercent = -1;
+    }
+    free(pInfo);
+    ClosePrinter(hPrinter);
+    return info;
+}
+
 bool SetPaperSize(LPCWSTR printerName, int paperSize) {
     HANDLE hPrinter;
     PRINTER_DEFAULTS pd = {NULL, NULL, PRINTER_ALL_ACCESS};
@@ -218,7 +266,22 @@ void methodHandlers(const flutter::MethodCall<> &call,
             (*result)->Success(false);
         }
 
-    }else {
+    } else if (call.method_name().compare("get_printer_status") == 0) {
+        const flutter::EncodableMap *argsList = std::get_if<flutter::EncodableMap>(
+                call.arguments());
+        auto printerNameValue = (argsList->find(flutter::EncodableValue("printer_name")))->second;
+        std::string printerNameUtf8 = std::get<std::string>(printerNameValue);
+        std::wstring printerName(printerNameUtf8.begin(), printerNameUtf8.end());
+        PrinterStatusInfo statusInfo = GetPrinterDeviceStatus(printerName.c_str());
+        flutter::EncodableMap statusMap;
+        statusMap[flutter::EncodableValue("status")] = flutter::EncodableValue(
+                static_cast<int>(statusInfo.status));
+        statusMap[flutter::EncodableValue("paperPercent")] = flutter::EncodableValue(
+                statusInfo.paperPercent);
+        statusMap[flutter::EncodableValue("inkPercent")] = flutter::EncodableValue(
+                statusInfo.inkPercent);
+        (*result)->Success(flutter::EncodableValue(statusMap));
+    } else {
         (*result)->NotImplemented();
     }
 }

@@ -22,6 +22,8 @@ class PrinterUtils {
   final MethodChannel _printerMethodChannel =
       MethodChannel(PrinterMethodChannelConstants.methodChannelName);
 
+  int printedCount = 0;
+
   Future<bool> printImage({
     required File file,
     PdfPageFormat format = PrinterConstants.p6x4Format,
@@ -82,6 +84,7 @@ class PrinterUtils {
     }
 
     await _waitForPrinterQueue(maxAttempts: 8);
+    printedCount += copies;
     return true;
   }
 
@@ -204,5 +207,23 @@ class PrinterUtils {
         "operation": action.value,
       },
     );
+  }
+
+  // Returns paperPercent and inkPercent from Win32 printer status flags.
+  // Values: 100=ok, 10=low, 0=empty, -1=unknown (query failed).
+  Future<({int paperPercent, int inkPercent})> getPrinterStatus() async {
+    try {
+      final result = await _printerMethodChannel.invokeMethod<Map>(
+        PrinterMethodChannelConstants.getStatusMethod,
+        {'printer_name': PrinterConstants.printerName},
+      );
+      if (result == null) return (paperPercent: -1, inkPercent: -1);
+      return (
+        paperPercent: (result['paperPercent'] as int?) ?? -1,
+        inkPercent: (result['inkPercent'] as int?) ?? -1,
+      );
+    } catch (_) {
+      return (paperPercent: -1, inkPercent: -1);
+    }
   }
 }

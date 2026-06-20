@@ -55,4 +55,11 @@ struct JobInfo {
     DWORD totalPages;
 };
 
+// Define PrinterStatusInfo structure
+struct PrinterStatusInfo {
+    DWORD status;       // raw Win32 status flags from PRINTER_INFO_2
+    int paperPercent;   // 0=empty, 10=low, 100=ok, -1=unknown
+    int inkPercent;     // 0=empty, 10=low, 100=ok, -1=unknown
+};
+
 #endif  // RUNNER_FLUTTER_WINDOW_H_
