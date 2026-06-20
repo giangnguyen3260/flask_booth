@@ -173,7 +173,7 @@ class FfmpegUtils {
       images: images,
       transparents: transparents,
       params: params,
-      flip: !flip,
+      flip: false,  // flip already applied by preprocessImage before mergeImage is called
     );
     try {
       return await _mergePreparedImageSlots(
@@ -401,6 +401,46 @@ class FfmpegUtils {
       ]),
     );
     return imageOutput;
+  }
+
+  Future<String> overlayQrOnImage({
+    required String imagePath,
+    required List<int> qrBytes,
+    int qrSize = 220,
+    int margin = 30,
+  }) async {
+    final qrTempPath = path.join(
+      _savedImagePath,
+      'qr_temp_${DateTimeUtils.format(date: DateTime.now(), format: "dd_MM_yyyy_HH_mm_ss")}.png',
+    );
+    final output = path.join(
+      _savedImagePath,
+      'QR_${DateTimeUtils.format(date: DateTime.now(), format: "dd_MM_yyyy_HH_mm_ss")}.png',
+    );
+    try {
+      await File(qrTempPath).writeAsBytes(qrBytes);
+      final outputFile = await FFMpegHelper.instance.runSync(
+        FFMpegCommand(outputFilepath: output, inputs: [
+          FFMpegInput([
+            '-i', imagePath,
+            '-i', qrTempPath,
+            '-filter_complex',
+            '[1:v]scale=$qrSize:$qrSize[qr];[0:v][qr]overlay=W-w-$margin:H-h-$margin',
+            '-frames:v', '1',
+            '-c:v', 'png',
+            '-y',
+          ]),
+        ]),
+        timeout: const Duration(seconds: 30),
+      );
+      if (outputFile != null && outputFile.existsSync()) {
+        return output;
+      }
+    } catch (_) {
+    } finally {
+      try { File(qrTempPath).deleteSync(); } catch (_) {}
+    }
+    return imagePath;
   }
 
   Future<String> mergeVideo(
