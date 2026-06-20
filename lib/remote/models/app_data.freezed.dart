@@ -1624,7 +1624,7 @@ mixin _$Background {
   @JsonKey(name: 'bgUrl')
   String? get bgUrl => throw _privateConstructorUsedError;
   @JsonKey(name: 'transparent')
-  String? get transparent => throw _privateConstructorUsedError;
+  List<List<double>>? get transparent => throw _privateConstructorUsedError;
   @JsonKey(name: 'maskJson')
   List<BackgroundMaskArea>? get maskJson => throw _privateConstructorUsedError;
 
@@ -1648,7 +1648,7 @@ abstract class $BackgroundCopyWith<$Res> {
       {@JsonKey(name: 'bgCd') String? bgCd,
       @JsonKey(name: 'bgNm') String? bgNm,
       @JsonKey(name: 'bgUrl') String? bgUrl,
-      @JsonKey(name: 'transparent') String? transparent,
+      @JsonKey(name: 'transparent') List<List<double>>? transparent,
       @JsonKey(name: 'maskJson') List<BackgroundMaskArea>? maskJson});
 }
 
@@ -1689,7 +1689,7 @@ class _$BackgroundCopyWithImpl<$Res, $Val extends Background>
       transparent: freezed == transparent
           ? _value.transparent
           : transparent // ignore: cast_nullable_to_non_nullable
-              as String?,
+              as List<List<double>>?,
       maskJson: freezed == maskJson
           ? _value.maskJson
           : maskJson // ignore: cast_nullable_to_non_nullable
@@ -1710,7 +1710,7 @@ abstract class _$$BackgroundImplCopyWith<$Res>
       {@JsonKey(name: 'bgCd') String? bgCd,
       @JsonKey(name: 'bgNm') String? bgNm,
       @JsonKey(name: 'bgUrl') String? bgUrl,
-      @JsonKey(name: 'transparent') String? transparent,
+      @JsonKey(name: 'transparent') List<List<double>>? transparent,
       @JsonKey(name: 'maskJson') List<BackgroundMaskArea>? maskJson});
 }
 
@@ -1747,9 +1747,9 @@ class __$$BackgroundImplCopyWithImpl<$Res>
           : bgUrl // ignore: cast_nullable_to_non_nullable
               as String?,
       transparent: freezed == transparent
-          ? _value.transparent
+          ? _value._transparent
           : transparent // ignore: cast_nullable_to_non_nullable
-              as String?,
+              as List<List<double>>?,
       maskJson: freezed == maskJson
           ? _value._maskJson
           : maskJson // ignore: cast_nullable_to_non_nullable
@@ -1765,9 +1765,10 @@ class _$BackgroundImpl extends _Background {
       {@JsonKey(name: 'bgCd') this.bgCd,
       @JsonKey(name: 'bgNm') this.bgNm,
       @JsonKey(name: 'bgUrl') this.bgUrl,
-      @JsonKey(name: 'transparent') this.transparent,
+      @JsonKey(name: 'transparent') final List<List<double>>? transparent,
       @JsonKey(name: 'maskJson') final List<BackgroundMaskArea>? maskJson})
-      : _maskJson = maskJson,
+      : _transparent = transparent,
+        _maskJson = maskJson,
         super._();
 
   factory _$BackgroundImpl.fromJson(Map<String, dynamic> json) =>
@@ -1782,9 +1783,17 @@ class _$BackgroundImpl extends _Background {
   @override
   @JsonKey(name: 'bgUrl')
   final String? bgUrl;
+  final List<List<double>>? _transparent;
   @override
   @JsonKey(name: 'transparent')
-  final String? transparent;
+  List<List<double>>? get transparent {
+    final value = _transparent;
+    if (value == null) return null;
+    if (_transparent is EqualUnmodifiableListView) return _transparent;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(value);
+  }
+
   final List<BackgroundMaskArea>? _maskJson;
   @override
   @JsonKey(name: 'maskJson')
@@ -1809,14 +1818,19 @@ class _$BackgroundImpl extends _Background {
             (identical(other.bgCd, bgCd) || other.bgCd == bgCd) &&
             (identical(other.bgNm, bgNm) || other.bgNm == bgNm) &&
             (identical(other.bgUrl, bgUrl) || other.bgUrl == bgUrl) &&
-            (identical(other.transparent, transparent) ||
-                other.transparent == transparent) &&
+            const DeepCollectionEquality()
+                .equals(other._transparent, _transparent) &&
             const DeepCollectionEquality().equals(other._maskJson, _maskJson));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  int get hashCode => Object.hash(runtimeType, bgCd, bgNm, bgUrl, transparent,
+  int get hashCode => Object.hash(
+      runtimeType,
+      bgCd,
+      bgNm,
+      bgUrl,
+      const DeepCollectionEquality().hash(_transparent),
       const DeepCollectionEquality().hash(_maskJson));
 
   /// Create a copy of Background
@@ -1840,7 +1854,7 @@ abstract class _Background extends Background {
       {@JsonKey(name: 'bgCd') final String? bgCd,
       @JsonKey(name: 'bgNm') final String? bgNm,
       @JsonKey(name: 'bgUrl') final String? bgUrl,
-      @JsonKey(name: 'transparent') final String? transparent,
+      @JsonKey(name: 'transparent') final List<List<double>>? transparent,
       @JsonKey(name: 'maskJson')
       final List<BackgroundMaskArea>? maskJson}) = _$BackgroundImpl;
   const _Background._() : super._();
@@ -1859,7 +1873,7 @@ abstract class _Background extends Background {
   String? get bgUrl;
   @override
   @JsonKey(name: 'transparent')
-  String? get transparent;
+  List<List<double>>? get transparent;
   @override
   @JsonKey(name: 'maskJson')
   List<BackgroundMaskArea>? get maskJson;
@@ -2132,6 +2146,8 @@ FrameSetting _$FrameSettingFromJson(Map<String, dynamic> json) {
 mixin _$FrameSetting {
   @JsonKey(name: 'numOfPhotos')
   int? get numOfPhotos => throw _privateConstructorUsedError;
+  @JsonKey(name: 'shortCount')
+  int? get shortCount => throw _privateConstructorUsedError;
   @JsonKey(name: 'timePerShot')
   int? get timePerShot => throw _privateConstructorUsedError;
   @JsonKey(name: 'additionPrice')
@@ -2159,6 +2175,7 @@ abstract class $FrameSettingCopyWith<$Res> {
   @useResult
   $Res call(
       {@JsonKey(name: 'numOfPhotos') int? numOfPhotos,
+      @JsonKey(name: 'shortCount') int? shortCount,
       @JsonKey(name: 'timePerShot') int? timePerShot,
       @JsonKey(name: 'additionPrice') double? additionPrice,
       @JsonKey(name: 'addPhotoNumber') int? addPhotoNumber,
@@ -2181,6 +2198,7 @@ class _$FrameSettingCopyWithImpl<$Res, $Val extends FrameSetting>
   @override
   $Res call({
     Object? numOfPhotos = freezed,
+    Object? shortCount = freezed,
     Object? timePerShot = freezed,
     Object? additionPrice = freezed,
     Object? addPhotoNumber = freezed,
@@ -2190,6 +2208,10 @@ class _$FrameSettingCopyWithImpl<$Res, $Val extends FrameSetting>
       numOfPhotos: freezed == numOfPhotos
           ? _value.numOfPhotos
           : numOfPhotos // ignore: cast_nullable_to_non_nullable
+              as int?,
+      shortCount: freezed == shortCount
+          ? _value.shortCount
+          : shortCount // ignore: cast_nullable_to_non_nullable
               as int?,
       timePerShot: freezed == timePerShot
           ? _value.timePerShot
@@ -2221,6 +2243,7 @@ abstract class _$$FrameSettingImplCopyWith<$Res>
   @useResult
   $Res call(
       {@JsonKey(name: 'numOfPhotos') int? numOfPhotos,
+      @JsonKey(name: 'shortCount') int? shortCount,
       @JsonKey(name: 'timePerShot') int? timePerShot,
       @JsonKey(name: 'additionPrice') double? additionPrice,
       @JsonKey(name: 'addPhotoNumber') int? addPhotoNumber,
@@ -2241,6 +2264,7 @@ class __$$FrameSettingImplCopyWithImpl<$Res>
   @override
   $Res call({
     Object? numOfPhotos = freezed,
+    Object? shortCount = freezed,
     Object? timePerShot = freezed,
     Object? additionPrice = freezed,
     Object? addPhotoNumber = freezed,
@@ -2250,6 +2274,10 @@ class __$$FrameSettingImplCopyWithImpl<$Res>
       numOfPhotos: freezed == numOfPhotos
           ? _value.numOfPhotos
           : numOfPhotos // ignore: cast_nullable_to_non_nullable
+              as int?,
+      shortCount: freezed == shortCount
+          ? _value.shortCount
+          : shortCount // ignore: cast_nullable_to_non_nullable
               as int?,
       timePerShot: freezed == timePerShot
           ? _value.timePerShot
@@ -2276,6 +2304,7 @@ class __$$FrameSettingImplCopyWithImpl<$Res>
 class _$FrameSettingImpl implements _FrameSetting {
   const _$FrameSettingImpl(
       {@JsonKey(name: 'numOfPhotos') this.numOfPhotos,
+      @JsonKey(name: 'shortCount') this.shortCount,
       @JsonKey(name: 'timePerShot') this.timePerShot,
       @JsonKey(name: 'additionPrice') this.additionPrice,
       @JsonKey(name: 'addPhotoNumber') this.addPhotoNumber,
@@ -2287,6 +2316,9 @@ class _$FrameSettingImpl implements _FrameSetting {
   @override
   @JsonKey(name: 'numOfPhotos')
   final int? numOfPhotos;
+  @override
+  @JsonKey(name: 'shortCount')
+  final int? shortCount;
   @override
   @JsonKey(name: 'timePerShot')
   final int? timePerShot;
@@ -2302,7 +2334,7 @@ class _$FrameSettingImpl implements _FrameSetting {
 
   @override
   String toString() {
-    return 'FrameSetting(numOfPhotos: $numOfPhotos, timePerShot: $timePerShot, additionPrice: $additionPrice, addPhotoNumber: $addPhotoNumber, addPhotoLimit: $addPhotoLimit)';
+    return 'FrameSetting(numOfPhotos: $numOfPhotos, shortCount: $shortCount, timePerShot: $timePerShot, additionPrice: $additionPrice, addPhotoNumber: $addPhotoNumber, addPhotoLimit: $addPhotoLimit)';
   }
 
   @override
@@ -2312,6 +2344,8 @@ class _$FrameSettingImpl implements _FrameSetting {
             other is _$FrameSettingImpl &&
             (identical(other.numOfPhotos, numOfPhotos) ||
                 other.numOfPhotos == numOfPhotos) &&
+            (identical(other.shortCount, shortCount) ||
+                other.shortCount == shortCount) &&
             (identical(other.timePerShot, timePerShot) ||
                 other.timePerShot == timePerShot) &&
             (identical(other.additionPrice, additionPrice) ||
@@ -2324,8 +2358,8 @@ class _$FrameSettingImpl implements _FrameSetting {
 
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  int get hashCode => Object.hash(runtimeType, numOfPhotos, timePerShot,
-      additionPrice, addPhotoNumber, addPhotoLimit);
+  int get hashCode => Object.hash(runtimeType, numOfPhotos, shortCount,
+      timePerShot, additionPrice, addPhotoNumber, addPhotoLimit);
 
   /// Create a copy of FrameSetting
   /// with the given fields replaced by the non-null parameter values.
@@ -2346,6 +2380,7 @@ class _$FrameSettingImpl implements _FrameSetting {
 abstract class _FrameSetting implements FrameSetting {
   const factory _FrameSetting(
           {@JsonKey(name: 'numOfPhotos') final int? numOfPhotos,
+          @JsonKey(name: 'shortCount') final int? shortCount,
           @JsonKey(name: 'timePerShot') final int? timePerShot,
           @JsonKey(name: 'additionPrice') final double? additionPrice,
           @JsonKey(name: 'addPhotoNumber') final int? addPhotoNumber,
@@ -2358,6 +2393,9 @@ abstract class _FrameSetting implements FrameSetting {
   @override
   @JsonKey(name: 'numOfPhotos')
   int? get numOfPhotos;
+  @override
+  @JsonKey(name: 'shortCount')
+  int? get shortCount;
   @override
   @JsonKey(name: 'timePerShot')
   int? get timePerShot;

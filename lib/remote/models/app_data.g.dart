@@ -131,7 +131,10 @@ _$BackgroundImpl _$$BackgroundImplFromJson(Map<String, dynamic> json) =>
       bgCd: json['bgCd'] as String?,
       bgNm: json['bgNm'] as String?,
       bgUrl: json['bgUrl'] as String?,
-      transparent: json['transparent'] as String?,
+      transparent: (json['transparent'] as List<dynamic>?)
+          ?.map((e) =>
+              (e as List<dynamic>).map((e) => (e as num).toDouble()).toList())
+          .toList(),
       maskJson: (json['maskJson'] as List<dynamic>?)
           ?.map((e) => BackgroundMaskArea.fromJson(e as Map<String, dynamic>))
           .toList(),
@@ -169,6 +172,7 @@ Map<String, dynamic> _$$BackgroundMaskAreaImplToJson(
 _$FrameSettingImpl _$$FrameSettingImplFromJson(Map<String, dynamic> json) =>
     _$FrameSettingImpl(
       numOfPhotos: (json['numOfPhotos'] as num?)?.toInt(),
+      shortCount: (json['shortCount'] as num?)?.toInt(),
       timePerShot: (json['timePerShot'] as num?)?.toInt(),
       additionPrice: (json['additionPrice'] as num?)?.toDouble(),
       addPhotoNumber: (json['addPhotoNumber'] as num?)?.toInt(),
@@ -178,6 +182,7 @@ _$FrameSettingImpl _$$FrameSettingImplFromJson(Map<String, dynamic> json) =>
 Map<String, dynamic> _$$FrameSettingImplToJson(_$FrameSettingImpl instance) =>
     <String, dynamic>{
       'numOfPhotos': instance.numOfPhotos,
+      'shortCount': instance.shortCount,
       'timePerShot': instance.timePerShot,
       'additionPrice': instance.additionPrice,
       'addPhotoNumber': instance.addPhotoNumber,

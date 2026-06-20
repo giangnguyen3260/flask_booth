@@ -185,7 +185,7 @@ class Background with _$Background {
     @JsonKey(name: 'bgCd') String? bgCd,
     @JsonKey(name: 'bgNm') String? bgNm,
     @JsonKey(name: 'bgUrl') String? bgUrl,
-    @JsonKey(name: 'transparent') String? transparent,
+    @JsonKey(name: 'transparent') List<List<double>>? transparent,
     @JsonKey(name: 'maskJson') List<BackgroundMaskArea>? maskJson,
   }) = _Background;
 
@@ -197,7 +197,7 @@ class Background with _$Background {
   }
 
   List<List<double>> getTransparentAreas() {
-    return StringUtils.parseToListOfListDouble(transparent ?? '');
+    return transparent ?? [];
   }
 }
 
@@ -224,6 +224,7 @@ class BackgroundMaskArea with _$BackgroundMaskArea {
 class FrameSetting with _$FrameSetting {
   const factory FrameSetting({
     @JsonKey(name: 'numOfPhotos') int? numOfPhotos,
+    @JsonKey(name: 'shortCount') int? shortCount,
     @JsonKey(name: 'timePerShot') int? timePerShot,
     @JsonKey(name: 'additionPrice') double? additionPrice,
     @JsonKey(name: 'addPhotoNumber') int? addPhotoNumber,

@@ -26,7 +26,9 @@ class ShootingScreenProvider extends BaseProvider<ShootingScreenListenState> {
 
   int get shotCount {
     final value =
-        appState.imageParam.selectedFrame.frameSetting?.numOfPhotos ?? 10;
+        appState.imageParam.selectedFrame.frameSetting?.shortCount ??
+            appState.imageParam.selectedFrame.frameSetting?.numOfPhotos ??
+            10;
     return value <= 0 ? 10 : value;
   }
 

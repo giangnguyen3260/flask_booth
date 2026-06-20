@@ -49,7 +49,7 @@ class _ShootingGuideScreenScreenState extends BasePageState<
   @override
   Widget buildPage(BuildContext context, maxWidth, maxHeight) {
     final frameSetting = appState.imageParam.selectedFrame.frameSetting;
-    final photoCount = frameSetting?.numOfPhotos ?? 10;
+    final photoCount = frameSetting?.shortCount ?? frameSetting?.numOfPhotos ?? 10;
     final shotTime = frameSetting?.timePerShot ?? 10;
 
     return LayoutBuilder(
