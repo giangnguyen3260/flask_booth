@@ -769,6 +769,8 @@ class AppState extends ChangeNotifier with LogMixin {
     final imageUrl = payload?.imageUrl ?? '';
     if (commandId.isEmpty || imageUrl.isEmpty) return;
 
+    final previousScreen = currentScreen;
+    currentScreen = 'AUTO_PRINTING';
     logD('AutoPrint executing commandId=$commandId imageUrl=$imageUrl');
     try {
       final fileName = 'autoprint_${commandId}_${imageUrl.split('/').last}';
@@ -811,8 +813,11 @@ class AppState extends ChangeNotifier with LogMixin {
           commandId,
           {'status': 'FAILED', 'error': e.toString()},
         );
-      } catch (_) {}
+      } catch (ackError) {
+        logE('AutoPrint failed to acknowledge FAILED status: $ackError');
+      }
     } finally {
+      currentScreen = previousScreen;
       async.unawaited(sendPrinterStatusReport());
     }
   }
