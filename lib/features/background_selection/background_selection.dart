@@ -759,10 +759,14 @@ class _BackgroundSelectionScreenState extends BasePageState<
                         maxScale: 1.8,
                         transformationController: _transformControllers[i],
                         trackpadScrollCausesScale: true,
-                        child: CommonShaderImage(
-                          effect: provider.effect,
-                          imagePath: imagePath,
-                        ).flip(isFlip: appState.imageParam.isFlipped),
+                        child: SizedBox(
+                          width: width,
+                          height: height,
+                          child: CommonShaderImage(
+                            effect: provider.effect,
+                            imagePath: imagePath,
+                          ).flip(isFlip: appState.imageParam.isFlipped),
+                        ),
                       ),
                     ),
             );

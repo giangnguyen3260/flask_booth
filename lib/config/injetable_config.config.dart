@@ -14,7 +14,6 @@ import 'package:injectable/injectable.dart' as _i526;
 
 import '../common/navigator/app_route_observer.dart' as _i332;
 import '../common/navigator/app_router.dart' as _i900;
-import '../common/provider/app_state%202.dart' as _i497;
 import '../common/provider/app_state.dart' as _i835;
 import '../common/remote/network_interceptor.dart' as _i599;
 import '../common/remote/network_provider.dart' as _i151;
@@ -98,11 +97,6 @@ extension GetItInjectableX on _i174.GetIt {
     gh.factory<_i817.PaymentScreenProvider>(() => _i817.PaymentScreenProvider(
           gh<_i483.BillAcceptorUtils>(),
           gh<_i382.CameraPowerUtil>(),
-        ));
-    gh.singleton<_i497.AppState>(() => _i497.AppState(
-          restClient: gh<_i81.RestClient>(),
-          remoteImageUtils: gh<_i1016.RemoteImageUtils>(),
-          networkProvider: gh<_i151.NetworkProvider>(),
         ));
     gh.singleton<_i835.AppState>(() => _i835.AppState(
           restClient: gh<_i81.RestClient>(),
