@@ -143,7 +143,18 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
 
       preparationStatus = 'Preparing selected photos...';
       notifyListeners();
-      final preprocessedImages = await _preprocessPrintImages();
+      final allPreprocessedImages = await _preprocessPrintImages();
+
+      // Take final effective count as min of ALL three inputs so
+      // _validateImageMergeInputs never sees a length mismatch.
+      final effectiveCount = [
+        transparent.length,
+        allPreprocessedImages.length,
+        params.length,
+      ].reduce(min);
+      final preprocessedImages = allPreprocessedImages.sublist(0, effectiveCount);
+      transparent = transparent.sublist(0, effectiveCount);
+      final effectiveParams = params.sublist(0, effectiveCount);
 
       if (isCut) {
         preparationStatus = 'Preparing printer cut mode...';
@@ -163,7 +174,7 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
             frameOverlayPath: backgroundPath,
             images: preprocessedImages,
             transparents: transparent,
-            params: params,
+            params: effectiveParams,
             flip: appState.imageParam.isFlipped);
         logD('Printing merge upload image done: $uploadImage');
         printingImage =
@@ -187,7 +198,7 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
             frameOverlayPath: backgroundPath,
             images: preprocessedImages,
             transparents: transparent,
-            params: params,
+            params: effectiveParams,
             flip: appState.imageParam.isFlipped);
         logD('Printing merge print image done: $printingImage');
         uploadImage = printingImage;
@@ -273,7 +284,8 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
       notifyListeners();
       return true;
     } catch (error, stackTrace) {
-      preparationStatus = 'Could not prepare print image';
+      final detail = error is StateError ? error.message : error.toString();
+      preparationStatus = 'Error: $detail';
       isUploadQueued = false;
       logE(error, stackTrace: stackTrace);
       notifyListeners();
