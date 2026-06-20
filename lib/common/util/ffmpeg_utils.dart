@@ -59,10 +59,11 @@ class FfmpegUtils {
       ColorFilterGenerator? filter,
       required String imagePath,
       required bool isFlip}) async {
-    var imagePathSplit = imagePath.split("\\");
-    if (imagePathSplit.isEmpty) return "";
-    var imageOutput = path.join(_savedImagePath,
-        "Processed_${imagePathSplit.last.replaceAll(".JPG", ".png")}");
+    if (imagePath.isEmpty) return "";
+    final imageBaseName = path.basename(imagePath);
+    var imageOutput = path.join(
+        _savedImagePath,
+        "Processed_${imageBaseName.replaceAll(".JPG", ".png").replaceAll(".jpg", ".png")}");
     final brightness =
         effect?.brightness ?? FilterEnum.brightness.getDefaultValue();
     final contrast = effect?.contrast ?? FilterEnum.contrast.getDefaultValue();
