@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math';
 import 'dart:typed_data';
 import 'dart:ui';
 
@@ -74,6 +75,14 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
         logD('Printing export stopped: transparent areas empty');
         return false;
       }
+
+      // Trim transparent to match images count — same guard as background selection preview.
+      // Prevents _validateImageMergeInputs from throwing when slot count != photo count.
+      final slotCount = min(transparent.length, appState.imageParam.images.length);
+      transparent = transparent.sublist(0, slotCount);
+      final params = appState.imageParam.pansAndScales.length >= slotCount
+          ? appState.imageParam.pansAndScales.sublist(0, slotCount)
+          : appState.imageParam.pansAndScales;
 
       var printingImage = "";
       var uploadImage = "";
@@ -154,7 +163,7 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
             frameOverlayPath: backgroundPath,
             images: preprocessedImages,
             transparents: transparent,
-            params: appState.imageParam.pansAndScales,
+            params: params,
             flip: appState.imageParam.isFlipped);
         logD('Printing merge upload image done: $uploadImage');
         printingImage =
@@ -178,7 +187,7 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
             frameOverlayPath: backgroundPath,
             images: preprocessedImages,
             transparents: transparent,
-            params: appState.imageParam.pansAndScales,
+            params: params,
             flip: appState.imageParam.isFlipped);
         logD('Printing merge print image done: $printingImage');
         uploadImage = printingImage;
