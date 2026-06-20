@@ -151,14 +151,15 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
         logD('Printing merge upload image start');
         uploadImage = await _ffmpegUtils.mergeImage(
             backgroundPath: backgroundPath,
-            frameOverlayPath: frameOverlayPath,
+            frameOverlayPath: backgroundPath,
             images: preprocessedImages,
             transparents: transparent,
             params: appState.imageParam.pansAndScales,
             flip: appState.imageParam.isFlipped);
         logD('Printing merge upload image done: $uploadImage');
-        printingImage = uploadImage;
-        logD('Printing cut print image uses upload image: $printingImage');
+        printingImage =
+            await _ffmpegUtils.mergeHorizontalImage(imagePath: uploadImage);
+        logD('Printing cut print image (hstack): $printingImage');
       } else {
         preparationStatus = 'Preparing printer cut mode...';
         notifyListeners();
@@ -174,7 +175,7 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
         logD('Printing merge print image start');
         printingImage = await _ffmpegUtils.mergeImage(
             backgroundPath: backgroundPath,
-            frameOverlayPath: frameOverlayPath,
+            frameOverlayPath: backgroundPath,
             images: preprocessedImages,
             transparents: transparent,
             params: appState.imageParam.pansAndScales,
@@ -215,6 +216,14 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
           encodedString: qrUrl,
           size: 250,
         );
+        if (qrCode.isNotEmpty) {
+          logD('Printing overlay QR on print image start');
+          printingImage = await _ffmpegUtils.overlayQrOnImage(
+            imagePath: printingImage,
+            qrBytes: qrCode,
+          );
+          logD('Printing overlay QR done: $printingImage');
+        }
       }
       preparationStatus = isUploadQueued ? 'Waiting to upload when online' : '';
       logD(
