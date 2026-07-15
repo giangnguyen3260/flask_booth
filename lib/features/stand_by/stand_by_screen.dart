@@ -33,15 +33,16 @@ class _StandByScreenState
   @override
   void initState() {
     super.initState();
-    unawaited(appState.checkForAdminDataUpdate(force: true));
-    unawaited(appState.retryPendingUploads());
-    unawaited(appState.sendPrinterStatusReport());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      unawaited(_runWhenAppReady(forceAdminCheck: true));
+    });
     _adminUpdateCheckTimer = Timer.periodic(
       AppState.adminUpdateCheckInterval,
       (_) {
-        unawaited(appState.checkForAdminDataUpdate());
-        unawaited(appState.retryPendingUploads());
-        unawaited(appState.sendPrinterStatusReport());
+        unawaited(_runStandByTasks());
       },
     );
   }
@@ -58,6 +59,25 @@ class _StandByScreenState
   @override
   bool allowToBack(StandByProvider provider) {
     return false;
+  }
+
+  Future<void> _runWhenAppReady({bool forceAdminCheck = false}) async {
+    while (mounted && !appState.isInitSuccess) {
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+    }
+    if (!mounted) {
+      return;
+    }
+    await _runStandByTasks(forceAdminCheck: forceAdminCheck);
+  }
+
+  Future<void> _runStandByTasks({bool forceAdminCheck = false}) async {
+    if (!appState.isInitSuccess) {
+      return;
+    }
+    await appState.checkForAdminDataUpdate(force: forceAdminCheck);
+    await appState.retryPendingUploads();
+    await appState.sendPrinterStatusReport();
   }
 
   @override

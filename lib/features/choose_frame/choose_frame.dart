@@ -266,7 +266,7 @@ class _ChooseFrameScreenState extends BasePageState<ChooseFrameListenState,
     final selected = provider.selectedFrame == index;
     final previewWidth = 172.w;
     final previewHeight = 178.h;
-    final label = (frame.frameCd ?? 'Frame').replaceAll('_', ' ');
+    final label = _frameDisplayName(frame);
     return GestureDetector(
       onTap: () {
         provider.selectFrame(index);
@@ -340,6 +340,14 @@ class _ChooseFrameScreenState extends BasePageState<ChooseFrameListenState,
     final price = frame.price ?? 0;
     return price.toMoney;
   }
+
+  String _frameDisplayName(FramesInfo frame) {
+    final frameName = frame.frameName?.trim();
+    if (frameName != null && frameName.isNotEmpty) {
+      return frameName;
+    }
+    return (frame.frameCd ?? 'Frame').replaceAll('_', ' ');
+  }
 }
 
 class _FramePreviewSurface extends StatelessWidget {
@@ -388,9 +396,11 @@ class _FrameImage extends StatelessWidget {
         filterQuality: FilterQuality.high,
       );
     }
-    final slots = frame.getDisplayTransparentAreas(
-      fallbackCount: frame.frameSetting?.numOfPhotos ?? 4,
-    );
+    final photoCount = frame.frameSetting?.numOfPhotos ?? 4;
+    final slots = frame.getDisplayTransparentAreas(fallbackCount: photoCount);
+    final slotCount = slots.isNotEmpty ? slots.length : photoCount;
+    final columns = slotCount == 1 ? 1 : (slotCount.isEven ? 2 : 3);
+    final rows = (slotCount / columns).ceil();
     return DecoratedBox(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -400,13 +410,26 @@ class _FrameImage extends StatelessWidget {
         padding: EdgeInsets.all(8.r),
         child: Column(
           children: List.generate(
-            slots.length.clamp(1, 4),
-            (index) => Expanded(
-              child: Container(
-                margin: EdgeInsets.all(3.r),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFD6D4CE),
-                  borderRadius: BorderRadius.circular(4.r),
+            rows,
+            (rowIndex) => Expanded(
+              child: Row(
+                children: List.generate(
+                  columns,
+                  (columnIndex) {
+                    final slotIndex = rowIndex * columns + columnIndex;
+                    if (slotIndex >= slotCount) {
+                      return const Expanded(child: SizedBox.shrink());
+                    }
+                    return Expanded(
+                      child: Container(
+                        margin: EdgeInsets.all(3.r),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFD6D4CE),
+                          borderRadius: BorderRadius.circular(4.r),
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ),
             ),
@@ -449,7 +472,10 @@ class _SelectedFrameAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final label = (frame.frameCd ?? 'Frame').replaceAll('_', ' ');
+    final frameName = frame.frameName?.trim();
+    final label = frameName != null && frameName.isNotEmpty
+        ? frameName
+        : (frame.frameCd ?? 'Frame').replaceAll('_', ' ');
     final price = frame.price ?? 0;
     return Material(
       color: FlashyBoothColors.pink,

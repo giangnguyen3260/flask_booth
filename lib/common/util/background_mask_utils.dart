@@ -18,14 +18,20 @@ class BackgroundMaskUtils {
       return sourcePath;
     }
 
-    final cacheKey = '$sourcePath::${jsonEncode(zones.map((e) => e.toJson()).toList())}';
+    final cacheKey =
+        '$sourcePath::${jsonEncode(zones.map((e) => e.toJson()).toList())}';
     final cached = _cache[cacheKey];
     if (cached != null && await File(cached).exists()) {
       return cached;
     }
 
     final bytes = await _readBytes(sourcePath);
-    final decoded = img.decodeImage(bytes);
+    img.Image? decoded;
+    try {
+      decoded = img.decodeImage(bytes);
+    } catch (_) {
+      return sourcePath;
+    }
     if (decoded == null) {
       return sourcePath;
     }

@@ -893,6 +893,8 @@ FramesInfo _$FramesInfoFromJson(Map<String, dynamic> json) {
 mixin _$FramesInfo {
   @JsonKey(name: 'frameCd')
   String? get frameCd => throw _privateConstructorUsedError;
+  @JsonKey(name: 'frameName')
+  String? get frameName => throw _privateConstructorUsedError;
   @JsonKey(name: 'frameUrl')
   String? get frameUrl => throw _privateConstructorUsedError;
   @JsonKey(name: 'frameUrlTempDis')
@@ -937,6 +939,7 @@ abstract class $FramesInfoCopyWith<$Res> {
   @useResult
   $Res call(
       {@JsonKey(name: 'frameCd') String? frameCd,
+      @JsonKey(name: 'frameName') String? frameName,
       @JsonKey(name: 'frameUrl') String? frameUrl,
       @JsonKey(name: 'frameUrlTempDis') String? frameUrlTempDis,
       @JsonKey(name: 'verticalYn') String? verticalYn,
@@ -969,6 +972,7 @@ class _$FramesInfoCopyWithImpl<$Res, $Val extends FramesInfo>
   @override
   $Res call({
     Object? frameCd = freezed,
+    Object? frameName = freezed,
     Object? frameUrl = freezed,
     Object? frameUrlTempDis = freezed,
     Object? verticalYn = freezed,
@@ -986,6 +990,10 @@ class _$FramesInfoCopyWithImpl<$Res, $Val extends FramesInfo>
       frameCd: freezed == frameCd
           ? _value.frameCd
           : frameCd // ignore: cast_nullable_to_non_nullable
+              as String?,
+      frameName: freezed == frameName
+          ? _value.frameName
+          : frameName // ignore: cast_nullable_to_non_nullable
               as String?,
       frameUrl: freezed == frameUrl
           ? _value.frameUrl
@@ -1063,6 +1071,7 @@ abstract class _$$FramesInfoImplCopyWith<$Res>
   @useResult
   $Res call(
       {@JsonKey(name: 'frameCd') String? frameCd,
+      @JsonKey(name: 'frameName') String? frameName,
       @JsonKey(name: 'frameUrl') String? frameUrl,
       @JsonKey(name: 'frameUrlTempDis') String? frameUrlTempDis,
       @JsonKey(name: 'verticalYn') String? verticalYn,
@@ -1094,6 +1103,7 @@ class __$$FramesInfoImplCopyWithImpl<$Res>
   @override
   $Res call({
     Object? frameCd = freezed,
+    Object? frameName = freezed,
     Object? frameUrl = freezed,
     Object? frameUrlTempDis = freezed,
     Object? verticalYn = freezed,
@@ -1111,6 +1121,10 @@ class __$$FramesInfoImplCopyWithImpl<$Res>
       frameCd: freezed == frameCd
           ? _value.frameCd
           : frameCd // ignore: cast_nullable_to_non_nullable
+              as String?,
+      frameName: freezed == frameName
+          ? _value.frameName
+          : frameName // ignore: cast_nullable_to_non_nullable
               as String?,
       frameUrl: freezed == frameUrl
           ? _value.frameUrl
@@ -1169,6 +1183,7 @@ class __$$FramesInfoImplCopyWithImpl<$Res>
 class _$FramesInfoImpl extends _FramesInfo {
   const _$FramesInfoImpl(
       {@JsonKey(name: 'frameCd') this.frameCd,
+      @JsonKey(name: 'frameName') this.frameName,
       @JsonKey(name: 'frameUrl') this.frameUrl,
       @JsonKey(name: 'frameUrlTempDis') this.frameUrlTempDis,
       @JsonKey(name: 'verticalYn') this.verticalYn,
@@ -1191,6 +1206,9 @@ class _$FramesInfoImpl extends _FramesInfo {
   @override
   @JsonKey(name: 'frameCd')
   final String? frameCd;
+  @override
+  @JsonKey(name: 'frameName')
+  final String? frameName;
   @override
   @JsonKey(name: 'frameUrl')
   final String? frameUrl;
@@ -1237,7 +1255,7 @@ class _$FramesInfoImpl extends _FramesInfo {
 
   @override
   String toString() {
-    return 'FramesInfo(frameCd: $frameCd, frameUrl: $frameUrl, frameUrlTempDis: $frameUrlTempDis, verticalYn: $verticalYn, cutYn: $cutYn, transparent: $transparent, width: $width, height: $height, printQuantity: $printQuantity, price: $price, currency: $currency, frameSetting: $frameSetting, backgroundInfo: $backgroundInfo)';
+    return 'FramesInfo(frameCd: $frameCd, frameName: $frameName, frameUrl: $frameUrl, frameUrlTempDis: $frameUrlTempDis, verticalYn: $verticalYn, cutYn: $cutYn, transparent: $transparent, width: $width, height: $height, printQuantity: $printQuantity, price: $price, currency: $currency, frameSetting: $frameSetting, backgroundInfo: $backgroundInfo)';
   }
 
   @override
@@ -1246,6 +1264,8 @@ class _$FramesInfoImpl extends _FramesInfo {
         (other.runtimeType == runtimeType &&
             other is _$FramesInfoImpl &&
             (identical(other.frameCd, frameCd) || other.frameCd == frameCd) &&
+            (identical(other.frameName, frameName) ||
+                other.frameName == frameName) &&
             (identical(other.frameUrl, frameUrl) ||
                 other.frameUrl == frameUrl) &&
             (identical(other.frameUrlTempDis, frameUrlTempDis) ||
@@ -1273,6 +1293,7 @@ class _$FramesInfoImpl extends _FramesInfo {
   int get hashCode => Object.hash(
       runtimeType,
       frameCd,
+      frameName,
       frameUrl,
       frameUrlTempDis,
       verticalYn,
@@ -1305,6 +1326,7 @@ class _$FramesInfoImpl extends _FramesInfo {
 abstract class _FramesInfo extends FramesInfo {
   const factory _FramesInfo(
       {@JsonKey(name: 'frameCd') final String? frameCd,
+      @JsonKey(name: 'frameName') final String? frameName,
       @JsonKey(name: 'frameUrl') final String? frameUrl,
       @JsonKey(name: 'frameUrlTempDis') final String? frameUrlTempDis,
       @JsonKey(name: 'verticalYn') final String? verticalYn,
@@ -1326,6 +1348,9 @@ abstract class _FramesInfo extends FramesInfo {
   @override
   @JsonKey(name: 'frameCd')
   String? get frameCd;
+  @override
+  @JsonKey(name: 'frameName')
+  String? get frameName;
   @override
   @JsonKey(name: 'frameUrl')
   String? get frameUrl;
@@ -2146,7 +2171,7 @@ FrameSetting _$FrameSettingFromJson(Map<String, dynamic> json) {
 mixin _$FrameSetting {
   @JsonKey(name: 'numOfPhotos')
   int? get numOfPhotos => throw _privateConstructorUsedError;
-  @JsonKey(name: 'shortCount')
+  @JsonKey(name: 'shotCount')
   int? get shortCount => throw _privateConstructorUsedError;
   @JsonKey(name: 'timePerShot')
   int? get timePerShot => throw _privateConstructorUsedError;
@@ -2175,7 +2200,7 @@ abstract class $FrameSettingCopyWith<$Res> {
   @useResult
   $Res call(
       {@JsonKey(name: 'numOfPhotos') int? numOfPhotos,
-      @JsonKey(name: 'shortCount') int? shortCount,
+      @JsonKey(name: 'shotCount') int? shortCount,
       @JsonKey(name: 'timePerShot') int? timePerShot,
       @JsonKey(name: 'additionPrice') double? additionPrice,
       @JsonKey(name: 'addPhotoNumber') int? addPhotoNumber,
@@ -2243,7 +2268,7 @@ abstract class _$$FrameSettingImplCopyWith<$Res>
   @useResult
   $Res call(
       {@JsonKey(name: 'numOfPhotos') int? numOfPhotos,
-      @JsonKey(name: 'shortCount') int? shortCount,
+      @JsonKey(name: 'shotCount') int? shortCount,
       @JsonKey(name: 'timePerShot') int? timePerShot,
       @JsonKey(name: 'additionPrice') double? additionPrice,
       @JsonKey(name: 'addPhotoNumber') int? addPhotoNumber,
@@ -2304,7 +2329,7 @@ class __$$FrameSettingImplCopyWithImpl<$Res>
 class _$FrameSettingImpl implements _FrameSetting {
   const _$FrameSettingImpl(
       {@JsonKey(name: 'numOfPhotos') this.numOfPhotos,
-      @JsonKey(name: 'shortCount') this.shortCount,
+      @JsonKey(name: 'shotCount') this.shortCount,
       @JsonKey(name: 'timePerShot') this.timePerShot,
       @JsonKey(name: 'additionPrice') this.additionPrice,
       @JsonKey(name: 'addPhotoNumber') this.addPhotoNumber,
@@ -2317,7 +2342,7 @@ class _$FrameSettingImpl implements _FrameSetting {
   @JsonKey(name: 'numOfPhotos')
   final int? numOfPhotos;
   @override
-  @JsonKey(name: 'shortCount')
+  @JsonKey(name: 'shotCount')
   final int? shortCount;
   @override
   @JsonKey(name: 'timePerShot')
@@ -2380,7 +2405,7 @@ class _$FrameSettingImpl implements _FrameSetting {
 abstract class _FrameSetting implements FrameSetting {
   const factory _FrameSetting(
           {@JsonKey(name: 'numOfPhotos') final int? numOfPhotos,
-          @JsonKey(name: 'shortCount') final int? shortCount,
+          @JsonKey(name: 'shotCount') final int? shortCount,
           @JsonKey(name: 'timePerShot') final int? timePerShot,
           @JsonKey(name: 'additionPrice') final double? additionPrice,
           @JsonKey(name: 'addPhotoNumber') final int? addPhotoNumber,
@@ -2394,7 +2419,7 @@ abstract class _FrameSetting implements FrameSetting {
   @JsonKey(name: 'numOfPhotos')
   int? get numOfPhotos;
   @override
-  @JsonKey(name: 'shortCount')
+  @JsonKey(name: 'shotCount')
   int? get shortCount;
   @override
   @JsonKey(name: 'timePerShot')

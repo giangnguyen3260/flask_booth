@@ -7,18 +7,27 @@ class ChooseFrameQuantityProvider
     extends BaseProvider<ChooseFrameQuantityListenState> {
   ChooseFrameQuantityProvider();
 
-  late int printQuantity =
-      int.tryParse(appState.imageParam.selectedFrame.printQuantity ?? "") ?? 0;
+  static const int _defaultPrintQuantity = 1;
+  static const int _defaultAddPhotoNumber = 1;
+  static const int _defaultAddPhotoLimit = 99;
+  static const double _defaultAdditionPrice = 30000;
 
-  late int frameQty =
-      int.tryParse(appState.imageParam.selectedFrame.printQuantity ?? "") ?? 0;
+  late int printQuantity = _positiveIntOrDefault(
+    int.tryParse(appState.imageParam.selectedFrame.printQuantity ?? ""),
+    _defaultPrintQuantity,
+  );
+
+  late int frameQty = printQuantity;
   late double price = appState.imageParam.selectedFrame.price ?? 0;
-  late double additionPrice =
-      appState.imageParam.selectedFrame.frameSetting?.additionPrice ?? 0;
-  late int addPhotoNumber =
-      appState.imageParam.selectedFrame.frameSetting?.addPhotoNumber ?? 0;
-  late int addPhotoLimit =
-      appState.imageParam.selectedFrame.frameSetting?.addPhotoLimit ?? 0;
+  late double additionPrice = _positiveDoubleOrDefault(
+    appState.imageParam.selectedFrame.frameSetting?.additionPrice,
+    _defaultAdditionPrice,
+  );
+  late int addPhotoNumber = _positiveIntOrDefault(
+    appState.imageParam.selectedFrame.frameSetting?.addPhotoNumber,
+    _defaultAddPhotoNumber,
+  );
+  late int addPhotoLimit = _resolveAddPhotoLimit();
 
   late double totalPrice = appState.imageParam.selectedFrame.price ?? 0;
 
@@ -36,5 +45,28 @@ class ChooseFrameQuantityProvider
       totalPrice -= additionPrice;
       notifyListeners();
     }
+  }
+
+  int _resolveAddPhotoLimit() {
+    final configuredLimit =
+        appState.imageParam.selectedFrame.frameSetting?.addPhotoLimit;
+    final fallbackLimit = printQuantity > _defaultAddPhotoLimit
+        ? printQuantity
+        : _defaultAddPhotoLimit;
+    return _positiveIntOrDefault(configuredLimit, fallbackLimit);
+  }
+
+  int _positiveIntOrDefault(int? value, int fallback) {
+    if (value == null || value <= 0) {
+      return fallback;
+    }
+    return value;
+  }
+
+  double _positiveDoubleOrDefault(double? value, double fallback) {
+    if (value == null || value <= 0) {
+      return fallback;
+    }
+    return value;
   }
 }

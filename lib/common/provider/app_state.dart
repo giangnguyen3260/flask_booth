@@ -39,6 +39,10 @@ class AppState extends ChangeNotifier with LogMixin {
   static const String _adminDataBackupFolder = 'admin_data_backups';
   static const String _adminDataCurrentFile = 'admin_data_current.json';
   static const String _uploadQueueFolder = 'upload_queue';
+  static const String _fallbackBackgroundAsset =
+      'assets/branding/screen_1_reference.png';
+  static const String _fallbackBackgroundIconAsset =
+      'assets/branding/flashy_booth_logo.jpg';
   static const Duration adminUpdateCheckInterval = Duration(minutes: 5);
 
   Locale locate = const Locale("vi");
@@ -201,16 +205,12 @@ class AppState extends ChangeNotifier with LogMixin {
       remoteApiBaseUrl =
           appBaseUrl.isNotEmpty ? appBaseUrl : serverConfigBaseUrl;
     }
-    if (remoteApiBaseUrl.isEmpty &&
-        !kReleaseMode &&
-        (Platform.isMacOS || Platform.isWindows || Platform.isLinux)) {
-      remoteApiBaseUrl = 'http://192.168.1.96:8080';
+    if (remoteApiBaseUrl.isEmpty) {
+      remoteApiBaseUrl = networkProvider.appDio.options.baseUrl;
     }
     _hasConfiguredRemoteApi = remoteApiBaseUrl.isNotEmpty;
     if (remoteApiBaseUrl.isNotEmpty) {
       networkProvider.setBaseUrl(remoteApiBaseUrl);
-    } else {
-      remoteApiBaseUrl = networkProvider.appDio.options.baseUrl;
     }
     final printerConfig = _readConfigSection("printer");
     _printerCode = _readConfigValue(
@@ -273,27 +273,24 @@ class AppState extends ChangeNotifier with LogMixin {
   Future<AppData> _prepareAppData(AppData remoteData) async {
     final List<FramesInfo> tempData = [];
     for (FramesInfo frameInfo in remoteData.framesInfo ?? []) {
-      var tempFramePath = await _resolveImagePath(frameInfo.frameUrlTempDis);
-      var mainFramePath = await _resolveImagePath(frameInfo.frameUrl);
+      final tempFramePath =
+          await _resolveOptionalImagePath(frameInfo.frameUrlTempDis);
+      final mainFramePath = await _resolveOptionalImagePath(frameInfo.frameUrl);
 
       frameInfo = frameInfo.copyWith(
-        frameUrlTempDis: tempFramePath.isNotEmpty ? tempFramePath : null,
-        frameUrl: mainFramePath.isNotEmpty ? mainFramePath : (tempFramePath.isNotEmpty ? tempFramePath : null),
+        frameUrlTempDis: tempFramePath,
+        frameUrl: mainFramePath ?? tempFramePath,
       );
       List<BackgroundInfo> tempBackgroundInfo = [];
       for (BackgroundInfo backgroundCategory
           in (frameInfo.backgroundInfo ?? [])) {
-        var backgroundCateFilePath =
-            await _resolveImagePath(backgroundCategory.bgCateIcon);
-        if (backgroundCateFilePath.isNotEmpty) {
-          backgroundCategory = backgroundCategory.copyWith(
-            bgCateIcon: backgroundCateFilePath,
-          );
-        }
+        final backgroundCateFilePath =
+            await _resolveOptionalImagePath(backgroundCategory.bgCateIcon);
         List<Background> tempBackground = [];
         for (Background background in (backgroundCategory.background ?? [])) {
-          var backgroundFilePath = await _resolveImagePath(background.bgUrl);
-          if (backgroundFilePath.isEmpty) continue;
+          var backgroundFilePath =
+              await _resolveOptionalImagePath(background.bgUrl);
+          if (backgroundFilePath == null) continue;
           if ((background.maskJson ?? []).isNotEmpty) {
             backgroundFilePath =
                 await backgroundMaskUtils.resolveMaskedBackgroundPath(
@@ -302,13 +299,18 @@ class AppState extends ChangeNotifier with LogMixin {
           background = background.copyWith(bgUrl: backgroundFilePath);
           tempBackground.add(background);
         }
-        backgroundCategory =
-            backgroundCategory.copyWith(background: tempBackground);
+        backgroundCategory = backgroundCategory.copyWith(
+          bgCateIcon: backgroundCateFilePath,
+          background: tempBackground,
+        );
         tempBackgroundInfo.add(backgroundCategory);
       }
+      if (!tempBackgroundInfo.any((cat) => (cat.background ?? []).isNotEmpty)) {
+        tempBackgroundInfo.add(await _fallbackBackgroundInfo(frameInfo));
+      }
       // Include frame if it has at least one usable background, even without a frame overlay image
-      final hasUsableBackgrounds = tempBackgroundInfo
-          .any((cat) => (cat.background ?? []).isNotEmpty);
+      final hasUsableBackgrounds =
+          tempBackgroundInfo.any((cat) => (cat.background ?? []).isNotEmpty);
       if (hasUsableBackgrounds || frameInfo.frameUrl != null) {
         tempData.add(frameInfo.copyWith(backgroundInfo: tempBackgroundInfo));
       }
@@ -317,6 +319,37 @@ class AppState extends ChangeNotifier with LogMixin {
       throw StateError('No usable frame assets were resolved from admin data');
     }
     return remoteData.copyWith(framesInfo: tempData);
+  }
+
+  Future<String?> _resolveOptionalImagePath(String? source) async {
+    final value = source?.trim() ?? "";
+    if (value.isEmpty) {
+      return null;
+    }
+    final resolved = await _resolveImagePath(value);
+    return resolved.isEmpty ? null : resolved;
+  }
+
+  Future<BackgroundInfo> _fallbackBackgroundInfo(FramesInfo frameInfo) async {
+    logE(
+      'Frame ${frameInfo.frameCd ?? 'unknown'} has no usable admin '
+      'background asset; using bundled fallback background.',
+    );
+    final backgroundPath = await _copyAssetToDocument(_fallbackBackgroundAsset);
+    final iconPath = await _copyAssetToDocument(_fallbackBackgroundIconAsset);
+    final frameCode = frameInfo.frameCd ?? 'unknown';
+    return BackgroundInfo(
+      bgCateCd: 'FALLBACK-CATE-$frameCode',
+      bgCateNm: 'Default',
+      bgCateIcon: iconPath,
+      background: [
+        Background(
+          bgCd: 'FALLBACK-BG-$frameCode',
+          bgNm: 'Default',
+          bgUrl: backgroundPath,
+        ),
+      ],
+    );
   }
 
   Future<void> _applyPreparedAppData(AppData preparedData) async {
@@ -693,6 +726,10 @@ class AppState extends ChangeNotifier with LogMixin {
 
   bool get isMockCameraMode => cameraMode.toLowerCase() == 'mock';
 
+  bool get isCanonCameraMode => cameraMode.toLowerCase() == 'canon';
+
+  bool get isWebcamCameraMode => cameraMode.toLowerCase() == 'webcam';
+
   bool get isMockPaymentMode =>
       (Platform.environment['PTB_PAYMENT_MODE'] ?? '').trim().toLowerCase() ==
           'mock' ||
@@ -774,7 +811,8 @@ class AppState extends ChangeNotifier with LogMixin {
     logD('AutoPrint executing commandId=$commandId imageUrl=$imageUrl');
     try {
       final fileName = 'autoprint_${commandId}_${imageUrl.split('/').last}';
-      final localPath = await remoteImageUtils.downloadAndSaveFile(imageUrl, fileName);
+      final localPath =
+          await remoteImageUtils.downloadAndSaveFile(imageUrl, fileName);
       if (localPath.isEmpty || !File(localPath).existsSync()) {
         throw StateError('AutoPrint download failed: $imageUrl');
       }
@@ -784,9 +822,8 @@ class AppState extends ChangeNotifier with LogMixin {
       final copies = isCut ? (quantity / 2).ceil() : quantity;
 
       final orientationStr = (payload?.orientation ?? '').toLowerCase();
-      final sizeForOrientation = orientationStr == 'landscape'
-          ? const Size(2, 1)
-          : const Size(1, 2);
+      final sizeForOrientation =
+          orientationStr == 'landscape' ? const Size(2, 1) : const Size(1, 2);
 
       await _printerUtils
           .printImage(
@@ -806,7 +843,8 @@ class AppState extends ChangeNotifier with LogMixin {
       );
     } catch (e, stackTrace) {
       logE(e, stackTrace: stackTrace);
-      updatePrinterConnectionStatus(connected: false, errorCode: 'AUTO_PRINT_FAILED');
+      updatePrinterConnectionStatus(
+          connected: false, errorCode: 'AUTO_PRINT_FAILED');
       try {
         await restClient.acknowledgeCommand(
           kioskCode,
@@ -1002,13 +1040,31 @@ class AppState extends ChangeNotifier with LogMixin {
   Future<void> _replaceCurrentAdminData(AppData preparedData) async {
     final directory = await _appDocumentSubDirectory(_adminDataBackupFolder);
     final file = File(path.join(directory.path, _adminDataCurrentFile));
-    final tempFile = File('${file.path}.tmp');
-    await tempFile.writeAsString(jsonEncode(preparedData.toJson()),
-        flush: true);
-    if (file.existsSync()) {
-      await file.delete();
+    final tempFile = File(
+      '${file.path}.${DateTime.now().microsecondsSinceEpoch}.tmp',
+    );
+    final payload = jsonEncode(preparedData.toJson());
+    await tempFile.writeAsString(payload, flush: true);
+
+    Object? lastError;
+    StackTrace? lastStackTrace;
+    for (var attempt = 0; attempt < 5; attempt++) {
+      try {
+        if (!tempFile.existsSync()) {
+          await tempFile.writeAsString(payload, flush: true);
+        }
+        if (file.existsSync()) {
+          await file.delete();
+        }
+        await tempFile.rename(file.path);
+        return;
+      } catch (error, stackTrace) {
+        lastError = error;
+        lastStackTrace = stackTrace;
+        await Future.delayed(const Duration(milliseconds: 250));
+      }
     }
-    await tempFile.rename(file.path);
+    Error.throwWithStackTrace(lastError!, lastStackTrace!);
   }
 
   Future<void> _saveAdminDataBackup(AppData preparedData) async {

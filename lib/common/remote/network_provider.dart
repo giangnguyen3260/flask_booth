@@ -29,6 +29,9 @@ class NetworkProvider extends AppNetworkProvider {
       receiveTimeout: const Duration(seconds: NetworkConstants.timeoutSeconds),
       sendTimeout: const Duration(seconds: NetworkConstants.timeoutSeconds),
       contentType: NetworkConstants.jsonContentType,
+      headers: const {
+        'Accept': 'application/json',
+      },
     );
   }
 

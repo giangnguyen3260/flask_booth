@@ -13,7 +13,6 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get_it/get_it.dart';
 import 'package:path/path.dart' as path;
 import 'package:project_l/common/constants/enum/e_aspect_ratio.dart';
-import 'package:project_l/common/log/log_mixin.dart';
 import 'package:project_l/common/navigator/app_router.gr.dart';
 import 'package:project_l/common/provider/base_page_state.dart';
 import 'package:project_l/common/util/directory_utils.dart';
@@ -40,12 +39,12 @@ class _ShootingScreenState extends BasePageState<ShootingScreenListenState,
     ShootingScreenProvider, ShootingScreen> {
   CameraController? controller;
   bool get isMockCameraMode => appState.isMockCameraMode;
+  bool get isCanonCameraMode => appState.isCanonCameraMode;
 
   int get shotCount {
-    final value =
-        appState.imageParam.selectedFrame.frameSetting?.shortCount ??
-            appState.imageParam.selectedFrame.frameSetting?.numOfPhotos ??
-            10;
+    final value = appState.imageParam.selectedFrame.frameSetting?.shortCount ??
+        appState.imageParam.selectedFrame.frameSetting?.numOfPhotos ??
+        10;
     return value <= 0 ? 10 : value;
   }
 
@@ -56,10 +55,11 @@ class _ShootingScreenState extends BasePageState<ShootingScreenListenState,
       CommonCounterController(defaultTime: shootingTime);
 
   final CommonCounterController _readyCounterController =
-      CommonCounterController(defaultTime: 3)..start();
+      CommonCounterController(defaultTime: 3);
 
   bool _isReadyGoVisible = false;
   bool _hasStartedShooting = false;
+  bool _hasStartedReadyCountdown = false;
   bool _hasCanonSession = false;
 
   @override
@@ -90,7 +90,7 @@ class _ShootingScreenState extends BasePageState<ShootingScreenListenState,
         .get<FfmpegUtils>()
         .createSession(sessionId: appState.imageParam.session);
     appState.cameraPowerUtil.turnOnCamera();
-    if (!isMockCameraMode) {
+    if (isCanonCameraMode) {
       t = Timer.periodic(Duration(seconds: 1), (timer) async {
         List<CameraModel> cameraList =
             await appState.cameraUtils.getCameraList();
@@ -114,6 +114,7 @@ class _ShootingScreenState extends BasePageState<ShootingScreenListenState,
             logD('Canon startPreview=$previewStarted');
             if (previewStarted) {
               _startCanonPreviewPolling();
+              _startReadyCountdown();
             }
           }
         }
@@ -178,6 +179,10 @@ class _ShootingScreenState extends BasePageState<ShootingScreenListenState,
     if (!isMockCameraMode) {
       CameraPlatform.instance.availableCameras().then((value) {
         logD('Available preview cameras: ${value.map((e) => e.name).toList()}');
+        if (value.isEmpty) {
+          logD('No preview cameras available');
+          return;
+        }
         setState(() {
           final cameraDescription = _pickPreferredCamera(value);
           controller = CameraController(
@@ -188,6 +193,7 @@ class _ShootingScreenState extends BasePageState<ShootingScreenListenState,
               return;
             } else {
               setState(() {});
+              _startReadyCountdown();
             }
           }).catchError((Object e) {
             if (e is CameraException) {
@@ -203,7 +209,23 @@ class _ShootingScreenState extends BasePageState<ShootingScreenListenState,
           });
         });
       });
+      Future.delayed(const Duration(seconds: 5), () {
+        if (mounted && !_hasStartedReadyCountdown) {
+          logD('Camera preview not ready after timeout; start countdown');
+          _startReadyCountdown();
+        }
+      });
+    } else {
+      _startReadyCountdown();
     }
+  }
+
+  void _startReadyCountdown() {
+    if (_hasStartedReadyCountdown || _hasStartedShooting) {
+      return;
+    }
+    _hasStartedReadyCountdown = true;
+    _readyCounterController.start();
   }
 
   Future<String> _ensureMockCapturePath() async {
@@ -316,7 +338,7 @@ class _ShootingScreenState extends BasePageState<ShootingScreenListenState,
 
   @override
   void dispose() {
-    if (!isMockCameraMode) {
+    if (isCanonCameraMode) {
       _canonPreviewTimer?.cancel();
       _liveViewShotRecorder?.cancel();
       appState.cameraUtils.stopPreview();
@@ -352,14 +374,14 @@ class _ShootingScreenState extends BasePageState<ShootingScreenListenState,
     _isReadyGoVisible = false;
     _commonCounterController.start();
     _commonCounterController.addListener(_handleShotCountdown);
-    if (!isMockCameraMode && _hasCanonSession) {
+    if (isCanonCameraMode && _hasCanonSession) {
       unawaited(_startLiveViewRecordingForNextShot());
     }
     setState(() {});
   }
 
   Future<void> _startLiveViewRecordingForNextShot() async {
-    if (isMockCameraMode || !_hasCanonSession) {
+    if (!isCanonCameraMode || !_hasCanonSession) {
       return;
     }
     _canonShotVideoIndex++;
@@ -395,7 +417,7 @@ class _ShootingScreenState extends BasePageState<ShootingScreenListenState,
   }
 
   Future<void> _startCanonRecordIfNeeded() async {
-    if (isMockCameraMode || !_hasCanonSession || _isCanonRecording) {
+    if (!isCanonCameraMode || !_hasCanonSession || _isCanonRecording) {
       return;
     }
     final started = await appState.cameraUtils.startRecord();
@@ -435,17 +457,17 @@ class _ShootingScreenState extends BasePageState<ShootingScreenListenState,
       } else {
         final videoFile = await _stopVideoRecordingIfNeeded();
         _shutter.value = true;
-        if (appState.isMockPaymentMode && !_hasCanonSession) {
+        if (!_hasCanonSession) {
           final imageFile = await _takeLaptopCameraPicture();
-          if (imageFile == null) return;
+          final imagePath = imageFile?.path ?? await _ensureMockCapturePath();
           await provider.saveMockCapture(
-            imagePath: imageFile.path,
+            imagePath: imagePath,
             videoPath: videoFile?.path,
           );
           if (mounted) {
             setState(() {
               _lastCapturedImagePath =
-                  provider.latestPreviewImagePath ?? imageFile.path;
+                  provider.latestPreviewImagePath ?? imagePath;
             });
           }
           if (provider.uiImages.length < shotCount) {
@@ -535,9 +557,48 @@ class _ShootingScreenState extends BasePageState<ShootingScreenListenState,
               count: provider.uiImages.length,
               total: shotCount,
               showShotCounter: false,
-              child: _ReadyCountdownOverlay(
-                count: _readyCounterController.currentCounter,
-                showReadyGo: _isReadyGoVisible,
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: _CameraCaptureLayout(
+                      secondsLeft: _readyCounterController.currentCounter,
+                      shotCount: provider.uiImages.length,
+                      totalShots: shotCount,
+                      preview: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Positioned.fill(
+                            child: isMockCameraMode
+                                ? const _CameraPreviewPlaceholder()
+                                : _canonTextureId != null
+                                    ? _CanonCapturePreview(
+                                        imagePath: null,
+                                        textureId: _canonTextureId,
+                                      )
+                                    : controller != null
+                                        ? CameraPreview(controller!)
+                                        : _CanonCapturePreview(
+                                            imagePath: null,
+                                            textureId: _canonTextureId,
+                                          ),
+                          ),
+                          if (!isMockCameraMode && controller != null)
+                            Positioned.fill(
+                              child: EAspectRatio.sixteenNine.coverWidget(
+                                isVertical: isVertical,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Positioned.fill(
+                    child: _ReadyCountdownOverlay(
+                      count: _readyCounterController.currentCounter,
+                      showReadyGo: _isReadyGoVisible,
+                    ),
+                  ),
+                ],
               ),
             );
           }
@@ -548,8 +609,6 @@ class _ShootingScreenState extends BasePageState<ShootingScreenListenState,
               provider,
             ]),
             builder: (context, _) {
-              final capturedPreviewPath =
-                  _lastCapturedImagePath ?? provider.latestPreviewImagePath;
               return _ShootingCanvas(
                 count: provider.uiImages.length,
                 total: shotCount,
@@ -586,17 +645,13 @@ class _ShootingScreenState extends BasePageState<ShootingScreenListenState,
                                   ? const _CameraPreviewPlaceholder()
                                   : _canonTextureId != null
                                       ? _CanonCapturePreview(
-                                          imagePath: capturedPreviewPath,
+                                          imagePath: null,
                                           textureId: _canonTextureId,
                                         )
                                       : controller != null
-                                          ? Transform.flip(
-                                              flipY: true,
-                                              flipX: false,
-                                              child: CameraPreview(controller!),
-                                            )
+                                          ? CameraPreview(controller!)
                                           : _CanonCapturePreview(
-                                              imagePath: capturedPreviewPath,
+                                              imagePath: null,
                                               textureId: _canonTextureId,
                                             ),
                             ),
@@ -606,11 +661,6 @@ class _ShootingScreenState extends BasePageState<ShootingScreenListenState,
                                   isVertical: isVertical,
                                 ),
                               ),
-                            _CapturedImageOverlay(
-                              imagePath: _canonTextureId == null
-                                  ? capturedPreviewPath
-                                  : null,
-                            ),
                             Positioned(
                               bottom: 20.h,
                               left: 0,
@@ -992,45 +1042,6 @@ class _LiveViewShotRecorder {
   }
 }
 
-class _CapturedImageOverlay extends StatelessWidget with LogMixin {
-  const _CapturedImageOverlay({required this.imagePath});
-
-  final String? imagePath;
-
-  @override
-  Widget build(BuildContext context) {
-    final value = imagePath;
-    if (value == null || value.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    final file = File(value);
-    if (!file.existsSync()) {
-      return const SizedBox.shrink();
-    }
-
-    try {
-      final bytes = file.readAsBytesSync();
-      final modified = file.lastModifiedSync().microsecondsSinceEpoch;
-      return Positioned.fill(
-        child: Image.memory(
-          bytes,
-          key: ValueKey('captured:${file.path}:$modified'),
-          fit: BoxFit.cover,
-          gaplessPlayback: true,
-          errorBuilder: (context, error, stackTrace) {
-            logE(error, stackTrace: stackTrace);
-            return const SizedBox.shrink();
-          },
-        ),
-      );
-    } catch (error, stackTrace) {
-      logE(error, stackTrace: stackTrace);
-      return const SizedBox.shrink();
-    }
-  }
-}
-
 class _CanonCapturePreview extends StatelessWidget {
   const _CanonCapturePreview({
     required this.imagePath,
@@ -1141,7 +1152,7 @@ class _ReadyCountdownOverlay extends StatelessWidget {
   Widget build(BuildContext context) {
     final safeCount = count.clamp(1, 3);
     return ColoredBox(
-      color: const Color(0xFF05050D),
+      color: Colors.black.withValues(alpha: 0.34),
       child: Center(
         child: AnimatedSwitcher(
           duration: const Duration(milliseconds: 260),
@@ -1296,8 +1307,9 @@ class _CapturedPhotoStrip extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: List.generate(totalShots, (i) {
-            final hasImage =
-                i < images.length && images[i].isNotEmpty && File(images[i]).existsSync();
+            final hasImage = i < images.length &&
+                images[i].isNotEmpty &&
+                File(images[i]).existsSync();
             return Padding(
               padding: EdgeInsets.symmetric(horizontal: gap / 2),
               child: ClipRRect(

@@ -72,6 +72,7 @@ Map<String, dynamic> _$$AppConfigItemImplToJson(_$AppConfigItemImpl instance) =>
 _$FramesInfoImpl _$$FramesInfoImplFromJson(Map<String, dynamic> json) =>
     _$FramesInfoImpl(
       frameCd: json['frameCd'] as String?,
+      frameName: json['frameName'] as String?,
       frameUrl: json['frameUrl'] as String?,
       frameUrlTempDis: json['frameUrlTempDis'] as String?,
       verticalYn: json['verticalYn'] as String?,
@@ -93,6 +94,7 @@ _$FramesInfoImpl _$$FramesInfoImplFromJson(Map<String, dynamic> json) =>
 Map<String, dynamic> _$$FramesInfoImplToJson(_$FramesInfoImpl instance) =>
     <String, dynamic>{
       'frameCd': instance.frameCd,
+      'frameName': instance.frameName,
       'frameUrl': instance.frameUrl,
       'frameUrlTempDis': instance.frameUrlTempDis,
       'verticalYn': instance.verticalYn,
@@ -172,7 +174,7 @@ Map<String, dynamic> _$$BackgroundMaskAreaImplToJson(
 _$FrameSettingImpl _$$FrameSettingImplFromJson(Map<String, dynamic> json) =>
     _$FrameSettingImpl(
       numOfPhotos: (json['numOfPhotos'] as num?)?.toInt(),
-      shortCount: (json['shortCount'] as num?)?.toInt(),
+      shortCount: (json['shotCount'] as num?)?.toInt(),
       timePerShot: (json['timePerShot'] as num?)?.toInt(),
       additionPrice: (json['additionPrice'] as num?)?.toDouble(),
       addPhotoNumber: (json['addPhotoNumber'] as num?)?.toInt(),
@@ -182,7 +184,7 @@ _$FrameSettingImpl _$$FrameSettingImplFromJson(Map<String, dynamic> json) =>
 Map<String, dynamic> _$$FrameSettingImplToJson(_$FrameSettingImpl instance) =>
     <String, dynamic>{
       'numOfPhotos': instance.numOfPhotos,
-      'shortCount': instance.shortCount,
+      'shotCount': instance.shortCount,
       'timePerShot': instance.timePerShot,
       'additionPrice': instance.additionPrice,
       'addPhotoNumber': instance.addPhotoNumber,

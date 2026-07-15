@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
@@ -49,6 +49,7 @@ class _BackgroundSelectionScreenState extends BasePageState<
   String _frameOverlaySourcePath = '';
   String _maskedFrameOverlayPath = '';
   Size _innerTransparentSize = Size.zero;
+  Size _firstTransparentDisplaySize = Size.zero;
   bool _didLogFirstFrame = false;
   FilterEnum? _activeAdjustment;
 
@@ -308,7 +309,8 @@ class _BackgroundSelectionScreenState extends BasePageState<
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           FlashyBoothScreenTitle(
-            title: flashyBoothText(context, vi: 'Ch\u1ec9nh \u1ea3nh', en: 'Edit Photo'),
+            title: flashyBoothText(context,
+                vi: 'Ch\u1ec9nh \u1ea3nh', en: 'Edit Photo'),
             subtitle: flashyBoothSecondaryText(
               context,
               vi: 'Ch\u1ec9nh \u1ea3nh',
@@ -444,7 +446,8 @@ class _BackgroundSelectionScreenState extends BasePageState<
           _buildPresetFilters(),
           18.verticalSpace,
           _EditToolButton(
-            title: flashyBoothText(context, vi: '\u0110\u1ed9 s\u00e1ng', en: 'Brightness'),
+            title: flashyBoothText(context,
+                vi: '\u0110\u1ed9 s\u00e1ng', en: 'Brightness'),
             subtitle: flashyBoothSecondaryText(
               context,
               vi: '\u0110\u1ed9 s\u00e1ng',
@@ -490,7 +493,8 @@ class _BackgroundSelectionScreenState extends BasePageState<
           ),
           18.verticalSpace,
           _EditToolButton(
-            title: flashyBoothText(context, vi: '\u0110en tr\u1eafng', en: 'B/W'),
+            title:
+                flashyBoothText(context, vi: '\u0110en tr\u1eafng', en: 'B/W'),
             subtitle: flashyBoothSecondaryText(
               context,
               vi: '\u0110en tr\u1eafng',
@@ -725,7 +729,8 @@ class _BackgroundSelectionScreenState extends BasePageState<
   }
 
   Widget _buildBackgroundLayer(String sceneBackgroundPath) {
-    return _buildImageFromPath(sceneBackgroundPath, key: ValueKey(sceneBackgroundPath));
+    return _buildImageFromPath(sceneBackgroundPath,
+        key: ValueKey(sceneBackgroundPath));
   }
 
   Widget _buildPhotoLayer() {
@@ -745,6 +750,9 @@ class _BackgroundSelectionScreenState extends BasePageState<
             final width = areas[i][2] * render.scaleWidth;
             final height = areas[i][3] * render.scaleHeight;
             _innerTransparentSize = Size(width, height);
+            if (i == 0) {
+              _firstTransparentDisplaySize = Size(width, height);
+            }
 
             return Positioned(
               left: render.offsetX + areas[i][0] * render.scaleWidth,
@@ -910,8 +918,8 @@ class _BackgroundSelectionScreenState extends BasePageState<
         primaryColor: Colors.black,
         style: ToastificationStyle.minimal,
         context: context,
-        title:
-            Text(flashyBoothTextRead(context, vi: 'Th\u00f4ng b\u00e1o', en: 'Notice')),
+        title: Text(flashyBoothTextRead(context,
+            vi: 'Th\u00f4ng b\u00e1o', en: 'Notice')),
         description: Text(
           flashyBoothTextRead(
             context,
@@ -929,8 +937,10 @@ class _BackgroundSelectionScreenState extends BasePageState<
 
   String _backgroundCategoryLabel(BuildContext context, String? label) {
     final normalized = (label ?? '').trim();
-    if (normalized.isEmpty || normalized.toLowerCase() == 'm\u1eb7c \u0111\u1ecbnh') {
-      return flashyBoothText(context, vi: 'M\u1eb7c \u0111\u1ecbnh', en: 'Default');
+    if (normalized.isEmpty ||
+        normalized.toLowerCase() == 'm\u1eb7c \u0111\u1ecbnh') {
+      return flashyBoothText(context,
+          vi: 'M\u1eb7c \u0111\u1ecbnh', en: 'Default');
     }
     return normalized;
   }
@@ -988,8 +998,15 @@ class _BackgroundSelectionScreenState extends BasePageState<
 
   void next() {
     appState.updateEffect(provider.effect);
-    final innerTransparentSize =
-        appState.imageParam.selectedFrame.getInnerImageSize();
+    final areas = _effectiveTransparentAreas;
+    final firstArea = areas.firstOrNull;
+    final sourceTransparentSize = Size(
+      firstArea?.elementAtOrNull(2) ?? 1,
+      firstArea?.elementAtOrNull(3) ?? 1,
+    );
+    final displayTransparentSize = _firstTransparentDisplaySize == Size.zero
+        ? _innerTransparentSize
+        : _firstTransparentDisplaySize;
     provider.updateMatrix(
       List.generate(
         _transformControllers.length,
@@ -1003,8 +1020,8 @@ class _BackgroundSelectionScreenState extends BasePageState<
         _transformControllers.length,
         (index) => _transformControllers[index].value.row1.a,
       ),
-      innerTransparentSize.$1 / math.max(_innerTransparentSize.width, 1),
-      innerTransparentSize.$2 / math.max(_innerTransparentSize.height, 1),
+      sourceTransparentSize.width / math.max(displayTransparentSize.width, 1),
+      sourceTransparentSize.height / math.max(displayTransparentSize.height, 1),
     );
 
     context.router.replace(

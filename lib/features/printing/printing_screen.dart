@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 import 'dart:async';
+import 'dart:ui' as ui;
 
 import 'package:auto_route/annotations.dart';
 import 'package:flutter/material.dart';
@@ -31,17 +32,20 @@ class PrintingScreen extends StatefulWidget {
 
 class _PrintingScreenState extends BasePageState<PrintingScreenListenState,
     PrintingScreenProvider, PrintingScreen> {
-  //todo replace real transparent areas
-  late final List<List<double>> _transparentAreas =
-      appState.imageParam.selectedFrame.getDisplayTransparentAreas(
-    fallbackCount:
-        appState.imageParam.selectedFrame.frameSetting?.numOfPhotos ?? 0,
-  );
+  Size _backgroundSize = const Size(1, 1);
+  String _lastLoadedBackgroundPath = "";
 
-  //todo replace real background size
-  late final Size _backgroundSize = Size(
-      appState.imageParam.selectedFrame.getSize().$1,
-      appState.imageParam.selectedFrame.getSize().$2);
+  List<List<double>> get _transparentAreas {
+    final backgroundAreas =
+        appState.imageParam.selectedBackground.getTransparentAreas();
+    if (backgroundAreas.isNotEmpty) {
+      return backgroundAreas;
+    }
+    return appState.imageParam.selectedFrame.getDisplayTransparentAreas(
+      fallbackCount:
+          appState.imageParam.selectedFrame.frameSetting?.numOfPhotos ?? 0,
+    );
+  }
 
   final FrameOverlayMaskUtils _frameOverlayMaskUtils = FrameOverlayMaskUtils();
   String _frameOverlaySourcePath = "";
@@ -93,6 +97,32 @@ class _PrintingScreenState extends BasePageState<PrintingScreenListenState,
     });
   }
 
+  Future<void> _loadBackgroundSize(String backgroundPath) async {
+    if (backgroundPath.isEmpty || backgroundPath == _lastLoadedBackgroundPath) {
+      return;
+    }
+    final backgroundFile = File(backgroundPath);
+    if (!backgroundFile.existsSync()) {
+      return;
+    }
+    try {
+      final bytes = await backgroundFile.readAsBytes();
+      final codec = await ui.instantiateImageCodec(bytes);
+      final frame = await codec.getNextFrame();
+      final width = frame.image.width.toDouble();
+      final height = frame.image.height.toDouble();
+      frame.image.dispose();
+      codec.dispose();
+      if (!mounted || width <= 1 || height <= 1) {
+        return;
+      }
+      setState(() {
+        _backgroundSize = Size(width, height);
+        _lastLoadedBackgroundPath = backgroundPath;
+      });
+    } catch (_) {}
+  }
+
   final List<VideoPlayerController> _videoPlayerControllers = [];
 
   @override
@@ -104,6 +134,7 @@ class _PrintingScreenState extends BasePageState<PrintingScreenListenState,
             "";
     _maskedFrameOverlayPath = _frameOverlaySourcePath;
     unawaited(_prepareMaskedFrameOverlay());
+    unawaited(_loadBackgroundSize(_resolvedSceneBackground));
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final exported = await provider.exportFiles();
       if (!mounted) {
@@ -180,6 +211,15 @@ class _PrintingScreenState extends BasePageState<PrintingScreenListenState,
 
   @override
   Widget buildPage(BuildContext context, double maxWidth, double maxHeight) {
+    final sceneBackground = _resolvedSceneBackground;
+    if (sceneBackground.isNotEmpty &&
+        sceneBackground != _lastLoadedBackgroundPath) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          unawaited(_loadBackgroundSize(sceneBackground));
+        }
+      });
+    }
     return LayoutBuilder(
       builder: (context, constraints) {
         final horizontalPadding =
@@ -428,7 +468,7 @@ class _PrintingScreenState extends BasePageState<PrintingScreenListenState,
       selector: (_, provider) => (
         provider.qrCode,
         provider.isUploadQueued,
-        provider.finalPrintImagePath,
+        provider.finalPreviewImagePath,
       ),
       builder: (context, state, child) {
         final qr = state.$1;
@@ -542,7 +582,7 @@ class _PrintingScreenState extends BasePageState<PrintingScreenListenState,
     return Stack(
       children: [
         Selector<PrintingScreenProvider, String>(
-          selector: (_, provider) => provider.finalPrintImagePath,
+          selector: (_, provider) => provider.finalPreviewImagePath,
           builder: (context, finalImagePath, child) {
             if (finalImagePath.isNotEmpty &&
                 File(finalImagePath).existsSync()) {

@@ -1,7 +1,6 @@
 import 'dart:io';
 
-const defaultBaseUrl =
-    'https://flashybooth.store';
+const defaultBaseUrl = 'https://admin.flashybooth.store';
 
 String resolveBaseUrl() {
   final value = Platform.environment['PTB_BASE_URL'];

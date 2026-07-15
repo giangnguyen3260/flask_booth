@@ -486,39 +486,45 @@ class _PaymentFrameSlots extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final frameSize = frame.getSize();
-    final areas = frame.getDisplayTransparentAreas(
-      fallbackCount: frame.frameSetting?.numOfPhotos ?? 0,
-    );
-    if (areas.isEmpty) {
-      return const SizedBox.shrink();
-    }
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final scaleWidth = constraints.maxWidth / frameSize.$1;
-        final scaleHeight = constraints.maxHeight / frameSize.$2;
-        return Stack(
-          children: List.generate(areas.length, (index) {
-            final area = areas[index];
-            return Positioned(
-              left: area[0] * scaleWidth,
-              top: area[1] * scaleHeight,
-              width: area[2] * scaleWidth,
-              height: area[3] * scaleHeight,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: const Color(0xFFD8D5CF),
-                  borderRadius: BorderRadius.circular(5.r),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.86),
-                    width: 1.2.w,
-                  ),
-                ),
+    final photoCount = frame.frameSetting?.numOfPhotos ?? 4;
+    final areas = frame.getDisplayTransparentAreas(fallbackCount: photoCount);
+    final slotCount = areas.isNotEmpty ? areas.length : photoCount;
+    final columns = slotCount == 1 ? 1 : (slotCount.isEven ? 2 : 3);
+    final rows = (slotCount / columns).ceil();
+
+    return Padding(
+      padding: EdgeInsets.all(10.r),
+      child: Column(
+        children: List.generate(
+          rows,
+          (rowIndex) => Expanded(
+            child: Row(
+              children: List.generate(
+                columns,
+                (columnIndex) {
+                  final slotIndex = rowIndex * columns + columnIndex;
+                  if (slotIndex >= slotCount) {
+                    return const Expanded(child: SizedBox.shrink());
+                  }
+                  return Expanded(
+                    child: Container(
+                      margin: EdgeInsets.all(4.r),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFD8D5CF),
+                        borderRadius: BorderRadius.circular(5.r),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.86),
+                          width: 1.2.w,
+                        ),
+                      ),
+                    ),
+                  );
+                },
               ),
-            );
-          }),
-        );
-      },
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

@@ -21,6 +21,7 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
   final FrameOverlayMaskUtils _frameOverlayMaskUtils = FrameOverlayMaskUtils();
   Uint8List qrCode = Uint8List.fromList([]);
   String finalPrintImagePath = '';
+  String finalPreviewImagePath = '';
   String qrUrl = '';
   String preparationStatus = '';
   bool isUploadQueued = false;
@@ -54,6 +55,7 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
     qrCode = Uint8List.fromList([]);
     qrUrl = '';
     finalPrintImagePath = '';
+    finalPreviewImagePath = '';
     preparationStatus = 'Preparing print image...';
     isUploadQueued = false;
     notifyListeners();
@@ -65,8 +67,7 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
       var transparent = bgTransparentAreas.isNotEmpty
           ? bgTransparentAreas
           : frameInfo.getDisplayTransparentAreas(
-              fallbackCount:
-                  frameInfo.frameSetting?.numOfPhotos ?? 0,
+              fallbackCount: frameInfo.frameSetting?.numOfPhotos ?? 0,
             );
 
       if (transparent.isEmpty) {
@@ -78,7 +79,8 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
 
       // Trim transparent to match images count — same guard as background selection preview.
       // Prevents _validateImageMergeInputs from throwing when slot count != photo count.
-      final slotCount = min(transparent.length, appState.imageParam.images.length);
+      final slotCount =
+          min(transparent.length, appState.imageParam.images.length);
       transparent = transparent.sublist(0, slotCount);
       final params = appState.imageParam.pansAndScales.length >= slotCount
           ? appState.imageParam.pansAndScales.sublist(0, slotCount)
@@ -105,6 +107,7 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
           frameOverlaySourcePath: frameOverlaySourcePath,
         );
         finalPrintImagePath = mockImage;
+        finalPreviewImagePath = mockImage;
         uploadImage = mockImage;
         final mockVideoPaths = _resolveMockVideoPaths();
         preparationStatus = 'Saving upload for later...';
@@ -152,7 +155,8 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
         allPreprocessedImages.length,
         params.length,
       ].reduce(min);
-      final preprocessedImages = allPreprocessedImages.sublist(0, effectiveCount);
+      final preprocessedImages =
+          allPreprocessedImages.sublist(0, effectiveCount);
       transparent = transparent.sublist(0, effectiveCount);
       final effectiveParams = params.sublist(0, effectiveCount);
 
@@ -180,6 +184,7 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
         printingImage =
             await _ffmpegUtils.mergeHorizontalImage(imagePath: uploadImage);
         logD('Printing cut print image (hstack): $printingImage');
+        finalPreviewImagePath = uploadImage;
       } else {
         preparationStatus = 'Preparing printer cut mode...';
         notifyListeners();
@@ -202,6 +207,7 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
             flip: appState.imageParam.isFlipped);
         logD('Printing merge print image done: $printingImage');
         uploadImage = printingImage;
+        finalPreviewImagePath = printingImage;
       }
 
       finalPrintImagePath = printingImage;
@@ -402,8 +408,8 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
         preparationStatus = 'Preparing lightweight video...';
         notifyListeners();
         logD('Printing slideshow video start: image=$uploadImage');
-        final slideshowVideo = await _ffmpegUtils
-            .createLightweightSlideshowVideo(
+        final slideshowVideo =
+            await _ffmpegUtils.createLightweightSlideshowVideo(
           imagePath: uploadImage,
         );
         videoPaths.add(slideshowVideo);

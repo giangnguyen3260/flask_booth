@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 
@@ -37,12 +37,11 @@ class _PhotoSelectionScreenState extends BasePageState<
   bool _isLoadingFallbackImages = false;
   List<String> _defaultSampleImages = [];
 
+  late final int _requiredPhotoCount = _resolveRequiredPhotoCount();
+
   late final List<List<double>> _displayTransparentAreas =
       appState.imageParam.selectedFrame.getDisplayTransparentAreas(
-    fallbackCount: max(
-      appState.imageParam.selectedFrame.frameSetting?.numOfPhotos ?? 0,
-      widget.files.length,
-    ),
+    fallbackCount: _requiredPhotoCount,
   );
 
   bool get _hasRealCapturedImages => widget.files.isNotEmpty;
@@ -63,9 +62,9 @@ class _PhotoSelectionScreenState extends BasePageState<
   @override
   void afterFirstBuild() {
     logD(
-      'PhotoSelectionScreen init: files=${widget.files.length}, displayAreas=${_displayTransparentAreas.length}, frame=${appState.imageParam.selectedFrame.frameCd}',
+      'PhotoSelectionScreen init: files=${widget.files.length}, required=$_requiredPhotoCount, displayAreas=${_displayTransparentAreas.length}, frame=${appState.imageParam.selectedFrame.frameCd}',
     );
-    provider.init(numPictures: _displayTransparentAreas.length);
+    provider.init(numPictures: _requiredPhotoCount);
     if (!_hasRealCapturedImages) {
       unawaited(_loadDefaultSampleImages());
     }
@@ -78,6 +77,15 @@ class _PhotoSelectionScreenState extends BasePageState<
     });
 
     super.afterFirstBuild();
+  }
+
+  int _resolveRequiredPhotoCount() {
+    final numOfPhotos =
+        appState.imageParam.selectedFrame.frameSetting?.numOfPhotos ?? 0;
+    if (numOfPhotos > 0) {
+      return numOfPhotos;
+    }
+    return max(widget.files.length, 1);
   }
 
   @override
@@ -578,7 +586,6 @@ class _ShotTile extends StatelessWidget {
   }
 }
 
-
 class _SelectedSlotsPanel extends StatelessWidget {
   const _SelectedSlotsPanel({
     required this.selectedImages,
@@ -596,6 +603,10 @@ class _SelectedSlotsPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final slotCount = selectedImages.length;
+    final columns = slotCount == 1 ? 1 : (slotCount.isEven ? 2 : 3);
+    final rows = (slotCount / columns).ceil();
+
     return Container(
       padding: EdgeInsets.all(12.r),
       decoration: BoxDecoration(
@@ -613,26 +624,57 @@ class _SelectedSlotsPanel extends StatelessWidget {
           ),
         ],
       ),
-      child: Column(
-        children: List.generate(selectedImages.length, (index) {
-          final image = selectedImages[index];
-          return Expanded(
-            child: Padding(
-              padding: EdgeInsets.only(
-                bottom: index == selectedImages.length - 1 ? 0 : 8.h,
-              ),
-              child: _SelectedSlotTile(
-                imagePath: image,
-                order: index + 1,
-                isActive: selectedSlotIndex == index,
-                isFlip: isFlip,
-                onTap: image.isEmpty
-                    ? () => onSlotTap(index: index)
-                    : () => onImageTap(index: index),
-              ),
-            ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final rowGap = 8.h;
+          final columnGap = 8.w;
+          final minTileHeight = 86.h;
+          final availableHeight = constraints.maxHeight - (rowGap * (rows - 1));
+          final tileHeight =
+              rows == 0 ? constraints.maxHeight : availableHeight / rows;
+          final needsScroll = tileHeight < minTileHeight;
+
+          final grid = Column(
+            children: List.generate(rows, (rowIndex) {
+              return SizedBox(
+                height: needsScroll ? minTileHeight : tileHeight,
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    bottom: rowIndex == rows - 1 ? 0 : rowGap,
+                  ),
+                  child: Row(
+                    children: List.generate(columns, (columnIndex) {
+                      final index = rowIndex * columns + columnIndex;
+                      return Expanded(
+                        child: Padding(
+                          padding: EdgeInsets.only(
+                            right: columnIndex == columns - 1 ? 0 : columnGap,
+                          ),
+                          child: index >= slotCount
+                              ? const SizedBox.shrink()
+                              : _SelectedSlotTile(
+                                  imagePath: selectedImages[index],
+                                  order: index + 1,
+                                  isActive: selectedSlotIndex == index,
+                                  isFlip: isFlip,
+                                  onTap: selectedImages[index].isEmpty
+                                      ? () => onSlotTap(index: index)
+                                      : () => onImageTap(index: index),
+                                ),
+                        ),
+                      );
+                    }),
+                  ),
+                ),
+              );
+            }),
           );
-        }),
+
+          if (!needsScroll) {
+            return grid;
+          }
+          return SingleChildScrollView(child: grid);
+        },
       ),
     );
   }
