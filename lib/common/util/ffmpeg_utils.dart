@@ -14,7 +14,6 @@ import 'package:project_l/common/models/effect.dart';
 import 'package:project_l/common/models/matrix_param.dart';
 import 'package:project_l/common/util/date_time_utils.dart';
 import 'package:project_l/common/util/directory_utils.dart';
-import 'package:project_l/gen/assets.gen.dart';
 
 @Singleton()
 class FfmpegUtils {
@@ -61,9 +60,17 @@ class FfmpegUtils {
       required bool isFlip}) async {
     if (imagePath.isEmpty) return "";
     final imageBaseName = path.basename(imagePath);
-    var imageOutput = path.join(
-        _savedImagePath,
-        "Processed_${imageBaseName.replaceAll(".JPG", ".png").replaceAll(".jpg", ".png")}");
+    final sourceExtension = path.extension(imageBaseName);
+    final safeSourceExtension =
+        sourceExtension.isEmpty ? '.jpg' : sourceExtension.toLowerCase();
+    final copiedImageOutput = path.join(
+      _savedImagePath,
+      "Processed_${path.basenameWithoutExtension(imageBaseName)}$safeSourceExtension",
+    );
+    final renderedImageOutput = path.join(
+      _savedImagePath,
+      "Processed_${path.basenameWithoutExtension(imageBaseName)}.png",
+    );
     final brightness =
         effect?.brightness ?? FilterEnum.brightness.getDefaultValue();
     final contrast = effect?.contrast ?? FilterEnum.contrast.getDefaultValue();
@@ -82,54 +89,86 @@ class FfmpegUtils {
         temperature == FilterEnum.temperature.getDefaultValue() &&
         sepia == FilterEnum.sepia.getDefaultValue() &&
         grain == FilterEnum.grain.getDefaultValue()) {
-      await File(imagePath).copy(imageOutput);
-      return imageOutput;
+      await File(imagePath).copy(copiedImageOutput);
+      return copiedImageOutput;
     }
-    ProcessResult process =
-        await Process.run(_resolveAssetFile(Assets.files.main), [
-      "--input",
-      imagePath,
-      "--output",
-      imageOutput,
-      "--brightness",
-      "$brightness",
-      "--contrast",
-      "$contrast",
-      "--saturation",
-      "$saturation",
-      "--vibrance",
-      "$vibrance",
-      "--temperature",
-      "$temperature",
-      "--sepia",
-      "$sepia",
-      "--grain",
-      "$grain",
-      "--flipX",
-      (isFlip ? "True" : "False")
-    ]).timeout(const Duration(seconds: 20));
 
-    if (kDebugMode) {
-      print(process.stdout);
+    final filters = _buildImagePreprocessFilters(
+      brightness: brightness,
+      contrast: contrast,
+      saturation: saturation,
+      vibrance: vibrance,
+      temperature: temperature,
+      sepia: sepia,
+      grain: grain,
+      isFlip: isFlip,
+    );
+    final args = <String>[
+      '-i',
+      imagePath,
+      if (filters.isNotEmpty) ...['-vf', filters],
+      '-frames:v',
+      '1',
+      '-c:v',
+      'png',
+      '-compression_level',
+      '1',
+      '-y',
+    ];
+    final outputFile = await FFMpegHelper.instance.runSync(
+      FFMpegCommand(
+        outputFilepath: renderedImageOutput,
+        inputs: [FFMpegInput(args)],
+      ),
+      timeout: const Duration(seconds: 30),
+    );
+    if (outputFile == null || !outputFile.existsSync()) {
+      throw StateError('FFmpeg image preprocess failed: $imagePath');
     }
-    return imageOutput;
+    return renderedImageOutput;
   }
 
-  String _resolveAssetFile(String assetPath) {
-    if (File(assetPath).existsSync()) {
-      return assetPath;
+  String _buildImagePreprocessFilters({
+    required double brightness,
+    required double contrast,
+    required double saturation,
+    required double vibrance,
+    required double temperature,
+    required double sepia,
+    required double grain,
+    required bool isFlip,
+  }) {
+    final filters = <String>[
+      if (isFlip) 'hflip',
+    ];
+    final adjustedSaturation = (saturation + vibrance).clamp(0.0, 3.0);
+    if (brightness != FilterEnum.brightness.getDefaultValue() ||
+        contrast != FilterEnum.contrast.getDefaultValue() ||
+        adjustedSaturation != FilterEnum.saturation.getDefaultValue()) {
+      filters.add(
+        'eq=brightness=${brightness.clamp(-1.0, 1.0)}'
+        ':contrast=${contrast.clamp(0.0, 3.0)}'
+        ':saturation=$adjustedSaturation',
+      );
     }
-    final executableDir = path.dirname(Platform.resolvedExecutable);
-    final bundledPath = path.joinAll([
-      executableDir,
-      'data',
-      'flutter_assets',
-      ...assetPath.split('/'),
-    ]);
-    if (File(bundledPath).existsSync()) {
-      return bundledPath;
+    if (temperature != FilterEnum.temperature.getDefaultValue()) {
+      final value = (temperature * 0.18).clamp(-1.0, 1.0);
+      filters.add('colorbalance=rs=$value:bs=${-value}');
     }
-    return assetPath;
+    if (sepia > FilterEnum.sepia.getDefaultValue()) {
+      final amount = sepia.clamp(0.0, 1.0);
+      filters.add(
+        'colorchannelmixer='
+        'rr=${1 - 0.607 * amount}:rg=${0.769 * amount}:rb=${0.189 * amount}:'
+        'gr=${0.349 * amount}:gg=${1 - 0.314 * amount}:gb=${0.168 * amount}:'
+        'br=${0.272 * amount}:bg=${0.534 * amount}:bb=${1 - 0.869 * amount}',
+      );
+    }
+    if (grain > FilterEnum.grain.getDefaultValue()) {
+      final strength = (grain * 80).clamp(0.0, 100.0);
+      filters.add('noise=alls=$strength:allf=t');
+    }
+    return filters.join(',');
   }
 
   String convertMatrixToGeq(List<double> matrix) {
@@ -174,7 +213,7 @@ class FfmpegUtils {
       images: images,
       transparents: transparents,
       params: params,
-      flip: false,  // flip already applied by preprocessImage before mergeImage is called
+      flip: flip,
     );
     try {
       return await _mergePreparedImageSlots(
@@ -234,8 +273,8 @@ class FfmpegUtils {
             math.max(slotHeight, (sourceSize.$2 * scale).ceil());
         final maxCropX = math.max(0, scaledWidth - slotWidth).toDouble();
         final maxCropY = math.max(0, scaledHeight - slotHeight).toDouble();
-        final cropX = params[i].panX.abs().clamp(0.0, maxCropX);
-        final cropY = params[i].panY.abs().clamp(0.0, maxCropY);
+        final cropX = (maxCropX / 2 + params[i].panX).clamp(0.0, maxCropX);
+        final cropY = (maxCropY / 2 + params[i].panY).clamp(0.0, maxCropY);
         final filters = <String>[
           if (flip) 'hflip',
           'scale=$scaledWidth:$scaledHeight',
@@ -374,11 +413,12 @@ class FfmpegUtils {
     required int slotHeight,
     required double requestedScale,
   }) {
-    final normalizedScale = requestedScale <= 0 ? 1.0 : requestedScale;
-    return math.max(
-      normalizedScale,
-      math.max(slotWidth / sourceWidth, slotHeight / sourceHeight),
+    final userScale = requestedScale <= 0 ? 1.0 : requestedScale;
+    final coverScale = math.max(
+      slotWidth / sourceWidth,
+      slotHeight / sourceHeight,
     );
+    return coverScale * userScale;
   }
 
   Future<String> mergeHorizontalImage({required String imagePath}) async {
@@ -407,7 +447,7 @@ class FfmpegUtils {
   Future<String> overlayQrOnImage({
     required String imagePath,
     required List<int> qrBytes,
-    int qrSize = 220,
+    int qrSize = 110,
     int margin = 30,
   }) async {
     final qrTempPath = path.join(
@@ -423,12 +463,16 @@ class FfmpegUtils {
       final outputFile = await FFMpegHelper.instance.runSync(
         FFMpegCommand(outputFilepath: output, inputs: [
           FFMpegInput([
-            '-i', imagePath,
-            '-i', qrTempPath,
+            '-i',
+            imagePath,
+            '-i',
+            qrTempPath,
             '-filter_complex',
             '[1:v]scale=$qrSize:$qrSize[qr];[0:v][qr]overlay=W-w-$margin:H-h-$margin',
-            '-frames:v', '1',
-            '-c:v', 'png',
+            '-frames:v',
+            '1',
+            '-c:v',
+            'png',
             '-y',
           ]),
         ]),
@@ -439,7 +483,9 @@ class FfmpegUtils {
       }
     } catch (_) {
     } finally {
-      try { File(qrTempPath).deleteSync(); } catch (_) {}
+      try {
+        File(qrTempPath).deleteSync();
+      } catch (_) {}
     }
     return imagePath;
   }
@@ -502,14 +548,12 @@ class FfmpegUtils {
         final slotOutput = path.join(slotDirectory.path, 'VideoSlot_$i.mp4');
         final slotWidth = _positiveInt(transparents[i][2]);
         final slotHeight = _positiveInt(transparents[i][3]);
-        final cropX = params[i].panX.abs();
-        final cropY = params[i].panY.abs();
-        final requestedScale = params[i].scale <= 0 ? 1.0 : params[i].scale;
+        final userScale = params[i].scale <= 0 ? 1.0 : params[i].scale;
         final filters = <String>[
           'fps=$_videoOutputFps',
           if (flip) 'hflip',
-          'scale=w=max(iw*$requestedScale\\,$slotWidth):h=max(ih*$requestedScale\\,$slotHeight)',
-          'crop=$slotWidth:$slotHeight:min($cropX\\,iw-$slotWidth):min($cropY\\,ih-$slotHeight)',
+          'scale=w=if(gt(iw/ih\\,$slotWidth/$slotHeight)\\,-2\\,$slotWidth*$userScale):h=if(gt(iw/ih\\,$slotWidth/$slotHeight)\\,$slotHeight*$userScale\\,-2)',
+          'crop=$slotWidth:$slotHeight:min(max((iw-$slotWidth)/2+${params[i].panX}\\,0)\\,iw-$slotWidth):min(max((ih-$slotHeight)/2+${params[i].panY}\\,0)\\,ih-$slotHeight)',
           'pad=width=ceil(iw/2)*2:height=ceil(ih/2)*2',
         ].join(',');
 
@@ -852,7 +896,8 @@ class FfmpegUtils {
       final currentInput = '[${i + 1}:v]';
       final formatted = '[slot$i]';
       final nextOutput = '[v${i + 1}]';
-      filterComplex += '$currentInput fps=$_videoOutputFps,format=rgba$formatted;';
+      filterComplex +=
+          '$currentInput fps=$_videoOutputFps,format=rgba$formatted;';
       filterComplex +=
           '$lastOutput$formatted overlay=${transparents[i][0]}:${transparents[i][1]}:shortest=0$nextOutput;';
       lastOutput = nextOutput;
@@ -861,9 +906,9 @@ class FfmpegUtils {
     final finalInputIndex = '[${slots.length + 1}:v]';
     filterComplex +=
         '$finalInputIndex fps=$_videoOutputFps,pad=width=ceil(iw/2)*2:height=ceil(ih/2)*2 [frame_padded];';
-    filterComplex += '$lastOutput[frame_padded] overlay=0:0:shortest=0 [with_frame];';
     filterComplex +=
-        '[with_frame]$backgroundTopOutput overlay=0:0:shortest=0';
+        '$lastOutput[frame_padded] overlay=0:0:shortest=0 [with_frame];';
+    filterComplex += '[with_frame]$backgroundTopOutput overlay=0:0:shortest=0';
 
     command
       ..add("-filter_threads")

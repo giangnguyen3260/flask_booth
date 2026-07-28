@@ -7,17 +7,13 @@ import 'dart:ui' as ui;
 import 'package:auto_route/annotations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:project_l/common/extensions/widget_extensions.dart';
 import 'package:project_l/common/navigator/app_router.gr.dart';
 import 'package:project_l/common/provider/base_page_state.dart';
-import 'package:project_l/common/util/frame_overlay_mask_utils.dart';
 import 'package:project_l/common/util/windows_util.dart';
 import 'package:project_l/features/printing/provider/printing_screen_listen_state.dart';
 import 'package:project_l/features/printing/provider/printing_screen_provider.dart';
-import 'package:project_l/gen/assets.gen.dart';
 import 'package:project_l/resources/flashy_booth_theme.dart';
 import 'package:provider/provider.dart';
-import 'package:video_player/video_player.dart';
 import 'package:window_manager/window_manager.dart';
 
 @RoutePage()
@@ -35,35 +31,10 @@ class _PrintingScreenState extends BasePageState<PrintingScreenListenState,
   Size _backgroundSize = const Size(1, 1);
   String _lastLoadedBackgroundPath = "";
 
-  List<List<double>> get _transparentAreas {
-    final backgroundAreas =
-        appState.imageParam.selectedBackground.getTransparentAreas();
-    if (backgroundAreas.isNotEmpty) {
-      return backgroundAreas;
-    }
-    return appState.imageParam.selectedFrame.getDisplayTransparentAreas(
-      fallbackCount:
-          appState.imageParam.selectedFrame.frameSetting?.numOfPhotos ?? 0,
-    );
-  }
-
-  final FrameOverlayMaskUtils _frameOverlayMaskUtils = FrameOverlayMaskUtils();
-  String _frameOverlaySourcePath = "";
-  String _maskedFrameOverlayPath = "";
-
-  bool get _isVertical => appState.imageParam.selectedFrame.isVertical();
-
   String get _resolvedFrameOverlaySourcePath =>
-      _frameOverlaySourcePath.isNotEmpty
-          ? _frameOverlaySourcePath
-          : appState.imageParam.selectedFrame.frameUrlTempDis ??
-              appState.imageParam.selectedFrame.frameUrl ??
-              "";
-
-  String get _resolvedFrameOverlayDisplayPath =>
-      _maskedFrameOverlayPath.isNotEmpty
-          ? _maskedFrameOverlayPath
-          : _resolvedFrameOverlaySourcePath;
+      appState.imageParam.selectedFrame.frameUrlTempDis ??
+      appState.imageParam.selectedFrame.frameUrl ??
+      "";
 
   String get _resolvedSceneBackground {
     final selectedBackground = appState.imageParam.selectedBackground;
@@ -76,25 +47,6 @@ class _PrintingScreenState extends BasePageState<PrintingScreenListenState,
       return _resolvedFrameOverlaySourcePath;
     }
     return "";
-  }
-
-  String get _resolvedFrameOverlay {
-    final frameOverlay = _resolvedFrameOverlayDisplayPath;
-    if (frameOverlay.isNotEmpty && File(frameOverlay).existsSync()) {
-      return frameOverlay;
-    }
-    return "";
-  }
-
-  Future<void> _prepareMaskedFrameOverlay() async {
-    final masked = await _frameOverlayMaskUtils
-        .resolveMaskedOverlayPath(_resolvedFrameOverlaySourcePath);
-    if (!mounted) {
-      return;
-    }
-    setState(() {
-      _maskedFrameOverlayPath = masked;
-    });
   }
 
   Future<void> _loadBackgroundSize(String backgroundPath) async {
@@ -123,17 +75,9 @@ class _PrintingScreenState extends BasePageState<PrintingScreenListenState,
     } catch (_) {}
   }
 
-  final List<VideoPlayerController> _videoPlayerControllers = [];
-
   @override
   void initState() {
     super.initState();
-    _frameOverlaySourcePath =
-        appState.imageParam.selectedFrame.frameUrlTempDis ??
-            appState.imageParam.selectedFrame.frameUrl ??
-            "";
-    _maskedFrameOverlayPath = _frameOverlaySourcePath;
-    unawaited(_prepareMaskedFrameOverlay());
     unawaited(_loadBackgroundSize(_resolvedSceneBackground));
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final exported = await provider.exportFiles();
@@ -147,32 +91,6 @@ class _PrintingScreenState extends BasePageState<PrintingScreenListenState,
         }
         return;
       }
-      if (appState.imageParam.videos.isEmpty) {
-        return;
-      }
-      if (appState.imageParam.videos.length > 1) {
-        return;
-      }
-
-      // Initialize first video
-      var firstController =
-          VideoPlayerController.file(File(appState.imageParam.videos[0]));
-      await firstController.initialize();
-      await firstController.setLooping(true);
-      await firstController.play();
-      _videoPlayerControllers.add(firstController);
-
-      // Initialize second video, then the rest, sequentially
-      for (int i = 1; i < appState.imageParam.videos.length; i++) {
-        var controller =
-            VideoPlayerController.file(File(appState.imageParam.videos[i]));
-        await controller.initialize();
-        await controller.setLooping(true);
-        await controller.play();
-        _videoPlayerControllers.add(controller);
-      }
-
-      setState(() {}); // Update the UI after initializing all controllers
     });
   }
 
@@ -199,9 +117,6 @@ class _PrintingScreenState extends BasePageState<PrintingScreenListenState,
   @override
   void dispose() async {
     super.dispose();
-    for (var video in _videoPlayerControllers) {
-      await video.dispose();
-    }
     if (await WindowsUtil.getAppMemoryUsage() >=
         (appState.appConfig['max_ram'] ?? 2048)) {
       WindowsUtil.restartApp(
@@ -464,16 +379,18 @@ class _PrintingScreenState extends BasePageState<PrintingScreenListenState,
   }
 
   Widget _buildDownloadPreviewBox() {
-    return Selector<PrintingScreenProvider, (Uint8List, bool, String)>(
+    return Selector<PrintingScreenProvider, (Uint8List, bool, String, String)>(
       selector: (_, provider) => (
         provider.qrCode,
         provider.isUploadQueued,
         provider.finalPreviewImagePath,
+        provider.preparationStatus,
       ),
       builder: (context, state, child) {
         final qr = state.$1;
         final isUploadQueued = state.$2;
         final finalImagePath = state.$3;
+        final status = state.$4;
         final hasFinalImage =
             finalImagePath.isNotEmpty && File(finalImagePath).existsSync();
         if (qr.isNotEmpty) {
@@ -507,7 +424,10 @@ class _PrintingScreenState extends BasePageState<PrintingScreenListenState,
                           fit: BoxFit.contain,
                           filterQuality: FilterQuality.high,
                         )
-                      : _buildLivePreview(),
+                      : _buildProcessingPreview(
+                          status: status,
+                          compact: true,
+                        ),
                 ),
                 Positioned(
                   right: 10.r,
@@ -579,108 +499,84 @@ class _PrintingScreenState extends BasePageState<PrintingScreenListenState,
   }
 
   Widget _buildFinalPreview() {
-    return Stack(
-      children: [
-        Selector<PrintingScreenProvider, String>(
-          selector: (_, provider) => provider.finalPreviewImagePath,
-          builder: (context, finalImagePath, child) {
-            if (finalImagePath.isNotEmpty &&
-                File(finalImagePath).existsSync()) {
-              return Positioned.fill(
-                child: Image.file(
-                  File(finalImagePath),
-                  fit: BoxFit.contain,
-                  filterQuality: FilterQuality.high,
-                ),
-              );
-            }
-            return child ?? const SizedBox.shrink();
-          },
-          child: Positioned.fill(child: _buildLivePreview()),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildLivePreview() {
-    return LayoutBuilder(
-      builder: (context, constraint) {
-        final render = _resolveRenderMetrics(
-          Size(constraint.maxWidth, constraint.maxHeight),
-        );
-        final holeRects = List<Rect>.generate(
-          _transparentAreas.length,
-          (i) => Rect.fromLTWH(
-            render.offsetX + _transparentAreas[i][0] * render.scaleWidth,
-            render.offsetY + _transparentAreas[i][1] * render.scaleHeight,
-            _transparentAreas[i][2] * render.scaleWidth,
-            _transparentAreas[i][3] * render.scaleHeight,
-          ),
-        );
-        return Stack(
-          children: [
-            Positioned.fill(
-              child: ClipPath(
-                clipper: _TransparentHolesClipper(holeRects: holeRects),
-                child: _resolvedSceneBackground.isEmpty
-                    ? Container(color: Colors.white)
-                    : Image.file(
-                        File(_resolvedSceneBackground),
-                        fit: BoxFit.contain,
-                        filterQuality: FilterQuality.high,
-                      ),
-              ),
-            ),
-            ...List.generate(
-              min(_videoPlayerControllers.length, _transparentAreas.length),
-              (i) => _buildVideoSlot(i, render),
-            ),
-            Positioned.fill(
-              child: _resolvedFrameOverlay.isEmpty
-                  ? Image.asset(
-                      _isVertical
-                          ? Assets.frame.frame4Vertical.path
-                          : Assets.frame.frame4Horizontal.path,
-                      fit: BoxFit.contain,
-                      filterQuality: FilterQuality.high,
-                    )
-                  : Image.file(
-                      File(_resolvedFrameOverlay),
-                      fit: BoxFit.contain,
-                      filterQuality: FilterQuality.high,
-                    ),
-            ),
-          ],
-        );
+    return Selector<PrintingScreenProvider, (String, String)>(
+      selector: (_, provider) => (
+        provider.finalPreviewImagePath,
+        provider.preparationStatus,
+      ),
+      builder: (context, state, child) {
+        final finalImagePath = state.$1;
+        final status = state.$2;
+        if (finalImagePath.isNotEmpty && File(finalImagePath).existsSync()) {
+          return Image.file(
+            File(finalImagePath),
+            fit: BoxFit.contain,
+            filterQuality: FilterQuality.high,
+          );
+        }
+        return _buildProcessingPreview(status: status);
       },
     );
   }
 
-  Widget _buildVideoSlot(int index, _RenderMetrics render) {
-    final controller = _videoPlayerControllers[index];
-    final slotWidth = _transparentAreas[index][2] * render.scaleWidth;
-    final slotHeight = _transparentAreas[index][3] * render.scaleHeight;
-    return Positioned(
-      left: render.offsetX + _transparentAreas[index][0] * render.scaleWidth,
-      top: render.offsetY + _transparentAreas[index][1] * render.scaleHeight,
-      width: slotWidth,
-      height: slotHeight,
-      child: ClipRect(
-        child: InteractiveViewer(
-          transformationController: widget.transformationControllers[index],
-          scaleEnabled: false,
-          panEnabled: false,
-          minScale: 1,
-          child: FittedBox(
-            fit: BoxFit.cover,
-            alignment: Alignment.center,
-            clipBehavior: Clip.antiAliasWithSaveLayer,
-            child: SizedBox(
-              height: 1,
-              width: controller.value.aspectRatio,
-              child: VideoPlayer(controller),
-            ),
-          ).flip(isFlip: appState.imageParam.isFlipped),
+  Widget _buildProcessingPreview({
+    required String status,
+    bool compact = false,
+  }) {
+    final label = status.isEmpty ? 'Preparing your photos...' : status;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF6FB),
+        borderRadius: BorderRadius.circular(compact ? 6.r : 10.r),
+      ),
+      child: Center(
+        child: Padding(
+          padding: EdgeInsets.all(compact ? 20.r : 36.r),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: compact ? 42.r : 76.r,
+                height: compact ? 42.r : 76.r,
+                child: CircularProgressIndicator(
+                  strokeWidth: compact ? 5.r : 7.r,
+                  color: FlashyBoothColors.pink,
+                  backgroundColor:
+                      FlashyBoothColors.pink.withValues(alpha: 0.12),
+                ),
+              ),
+              if (!compact) ...[
+                28.verticalSpace,
+                Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontFamily: 'Lexend',
+                    fontSize: 24.sp,
+                    fontWeight: FontWeight.w900,
+                    color: FlashyBoothColors.pink,
+                    height: 1.15,
+                  ),
+                ),
+                10.verticalSpace,
+                Text(
+                  'Please wait',
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontFamily: 'Lexend',
+                    fontSize: 16.sp,
+                    fontWeight: FontWeight.w700,
+                    color: FlashyBoothColors.pink.withValues(alpha: 0.48),
+                    height: 1,
+                  ),
+                ),
+              ],
+            ],
+          ),
         ),
       ),
     );
@@ -752,36 +648,6 @@ class _PrintingScreenState extends BasePageState<PrintingScreenListenState,
       ),
     );
   }
-
-  _RenderMetrics _resolveRenderMetrics(Size containerSize) {
-    final fitted = applyBoxFit(
-      BoxFit.contain,
-      _backgroundSize,
-      containerSize,
-    );
-    final renderWidth = fitted.destination.width;
-    final renderHeight = fitted.destination.height;
-    return _RenderMetrics(
-      offsetX: (containerSize.width - renderWidth) / 2,
-      offsetY: (containerSize.height - renderHeight) / 2,
-      scaleWidth: renderWidth / _backgroundSize.width,
-      scaleHeight: renderHeight / _backgroundSize.height,
-    );
-  }
-}
-
-class _RenderMetrics {
-  const _RenderMetrics({
-    required this.offsetX,
-    required this.offsetY,
-    required this.scaleWidth,
-    required this.scaleHeight,
-  });
-
-  final double offsetX;
-  final double offsetY;
-  final double scaleWidth;
-  final double scaleHeight;
 }
 
 class WavyCircleClipper extends CustomClipper<Path> {
@@ -820,33 +686,4 @@ class WavyCircleClipper extends CustomClipper<Path> {
 
   @override
   bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
-}
-
-class _TransparentHolesClipper extends CustomClipper<Path> {
-  const _TransparentHolesClipper({required this.holeRects});
-
-  final List<Rect> holeRects;
-
-  @override
-  Path getClip(Size size) {
-    final path = Path()..fillType = PathFillType.evenOdd;
-    path.addRect(Offset.zero & size);
-    for (final rect in holeRects) {
-      path.addRect(rect);
-    }
-    return path;
-  }
-
-  @override
-  bool shouldReclip(covariant _TransparentHolesClipper oldClipper) {
-    if (oldClipper.holeRects.length != holeRects.length) {
-      return true;
-    }
-    for (var i = 0; i < holeRects.length; i++) {
-      if (oldClipper.holeRects[i] != holeRects[i]) {
-        return true;
-      }
-    }
-    return false;
-  }
 }

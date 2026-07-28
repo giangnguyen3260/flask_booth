@@ -45,21 +45,6 @@ class ShootingScreenProvider extends BaseProvider<ShootingScreenListenState> {
       ),
     );
     notifyListeners();
-    final (double, double) size =
-        appState.imageParam.selectedFrame.getInnerImageSize();
-    _ffmpegUtils.preprocessShootingImage(
-        imagePath: imagePath,
-        width: size.$1,
-        height: size.$2,
-        onComplete: (image) {
-          if (image == null) {
-            logE('Shooting preprocess image failed: $imagePath');
-            return;
-          }
-          logD('Shooting preprocess image done: ${image.path}');
-          tImages.add(image.path);
-          notifyListeners();
-        });
   }
 
   void saveVideo({required String videoPath, required int second}) {
@@ -136,32 +121,21 @@ class ShootingScreenProvider extends BaseProvider<ShootingScreenListenState> {
   void onNextEvent() async {
     isLoading = true;
     notifyListeners();
-    final timeout = DateTime.now().add(const Duration(seconds: 90));
-    while (tImages.length != shotCount ||
-        tVideos.length != shotCount ||
-        tVideos.length != tImages.length) {
-      if (DateTime.now().isAfter(timeout)) {
-        while (tImages.length < shotCount) {
-          final index = tImages.length;
-          final fallbackPath =
-              index < uiImages.length ? uiImages[index] : uiImages.lastOrNull;
-          tImages.add(fallbackPath ?? "");
-        }
-        while (tVideos.length < shotCount) {
-          final index = tVideos.length;
-          final fallbackPath =
-              index < uiImages.length ? uiImages[index] : uiImages.lastOrNull;
-          tVideos.add(fallbackPath ?? "");
-        }
-        break;
+
+    final shouldWaitForVideos = appState.videoExportMode == 'merge';
+    if (shouldWaitForVideos) {
+      final timeout = DateTime.now().add(const Duration(seconds: 90));
+      while (tVideos.length < shotCount && DateTime.now().isBefore(timeout)) {
+        await Future.delayed(const Duration(seconds: 1));
       }
-      await Future.delayed(Duration(seconds: 1));
     }
 
-    final orderedImages = [...tImages]..sort();
-    final orderedVideos = [...tVideos]..sort();
+    realDataFiles.clear();
+    final orderedImages = [...uiImages];
+    final orderedVideos = [...tVideos];
     for (int i = 0; i < orderedImages.length; i++) {
-      realDataFiles[orderedImages[i]] = orderedVideos[i];
+      realDataFiles[orderedImages[i]] =
+          i < orderedVideos.length ? orderedVideos[i] : '';
     }
     logD('Shooting onNext files: ${realDataFiles.keys.toList()}');
 

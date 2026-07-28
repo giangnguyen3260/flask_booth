@@ -47,9 +47,12 @@ class PrinterUtils {
             : pw.PageOrientation.landscape,
         pageFormat: format,
         build: (pw.Context context) {
-          return pw.Image(
-            pw.MemoryImage(
-              bytes,
+          return pw.Center(
+            child: pw.Image(
+              pw.MemoryImage(
+                bytes,
+              ),
+              fit: pw.BoxFit.contain,
             ),
           );
         },

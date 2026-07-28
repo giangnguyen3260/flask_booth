@@ -1059,9 +1059,13 @@ class _CanonCapturePreview extends StatelessWidget {
         fit: StackFit.expand,
         children: [
           const ColoredBox(color: Colors.black),
-          Texture(
-            textureId: valueTextureId,
-            filterQuality: FilterQuality.medium,
+          Transform(
+            alignment: Alignment.center,
+            transform: Matrix4.diagonal3Values(-1.0, 1.0, 1.0),
+            child: Texture(
+              textureId: valueTextureId,
+              filterQuality: FilterQuality.medium,
+            ),
           ),
         ],
       );

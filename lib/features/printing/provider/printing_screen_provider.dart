@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'dart:ui';
 
 import 'package:injectable/injectable.dart';
+import 'package:project_l/common/enums/orientation_enum.dart';
 import 'package:project_l/common/enums/printer_cut_mode.dart';
 import 'package:project_l/common/extensions/size_extension.dart';
 import 'package:project_l/common/provider/base_provider.dart';
@@ -100,10 +101,12 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
       );
       final backgroundPath =
           _resolveSceneBackgroundPath(frameOverlaySourcePath);
+      final effectiveFrameOverlayPath =
+          frameOverlayPath.isNotEmpty ? frameOverlayPath : backgroundPath;
       if (appState.isMockPaymentMode) {
         final mockImage = _resolveMockPrintImage(
           backgroundPath: backgroundPath,
-          frameOverlayPath: frameOverlayPath,
+          frameOverlayPath: effectiveFrameOverlayPath,
           frameOverlaySourcePath: frameOverlaySourcePath,
         );
         finalPrintImagePath = mockImage;
@@ -175,7 +178,7 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
         logD('Printing merge upload image start');
         uploadImage = await _ffmpegUtils.mergeImage(
             backgroundPath: backgroundPath,
-            frameOverlayPath: backgroundPath,
+            frameOverlayPath: effectiveFrameOverlayPath,
             images: preprocessedImages,
             transparents: transparent,
             params: effectiveParams,
@@ -200,7 +203,7 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
         logD('Printing merge print image start');
         printingImage = await _ffmpegUtils.mergeImage(
             backgroundPath: backgroundPath,
-            frameOverlayPath: backgroundPath,
+            frameOverlayPath: effectiveFrameOverlayPath,
             images: preprocessedImages,
             transparents: transparent,
             params: effectiveParams,
@@ -215,7 +218,7 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
 
       final videoPaths = await _prepareVideoPaths(
         backgroundPath: backgroundPath,
-        frameOverlayPath: frameOverlayPath,
+        frameOverlayPath: effectiveFrameOverlayPath,
         uploadImage: uploadImage,
         transparents: transparent,
       );
@@ -260,14 +263,15 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
       try {
         preparationStatus = 'Sending print job...';
         notifyListeners();
-        var size = appState.imageParam.selectedFrame.getSize();
+        final orientation = await _resolvePrintImageOrientation(printingImage);
         final printCopies = _resolvePrintCopies(isCut: isCut);
-        logD('Printing print job start: $printingImage');
+        logD(
+            'Printing print job start: $printingImage orientation=$orientation');
         final printQueued = await _printerUtils
             .printImage(
               file: File(printingImage),
               numCut: printCopies,
-              orientation: Size(size.$1, size.$2).orientation,
+              orientation: orientation,
             )
             .timeout(
               const Duration(seconds: 45),
@@ -326,7 +330,7 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
         imagePath: imagePath,
         effect: appState.imageParam.effect,
         filter: appState.imageParam.colorFilter,
-        isFlip: appState.imageParam.isFlipped,
+        isFlip: false,
       );
       if (outputPath.isEmpty || !File(outputPath).existsSync()) {
         throw StateError('Could not preprocess print image: $imagePath');
@@ -449,5 +453,28 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
     final quantity = appState.imageParam.printQuantity;
     final copies = isCut ? (quantity / 2).ceil() : quantity;
     return copies < 1 ? 1 : copies;
+  }
+
+  Future<OrientationEnum> _resolvePrintImageOrientation(
+    String imagePath,
+  ) async {
+    try {
+      final bytes = await File(imagePath).readAsBytes();
+      final codec = await instantiateImageCodec(bytes);
+      final frame = await codec.getNextFrame();
+      final image = frame.image;
+      final orientation =
+          Size(image.width.toDouble(), image.height.toDouble()).orientation;
+      logD(
+        'Printing resolved image orientation: '
+        '${image.width}x${image.height} $orientation',
+      );
+      image.dispose();
+      codec.dispose();
+      return orientation;
+    } catch (error, stackTrace) {
+      logE(error, stackTrace: stackTrace);
+      return OrientationEnum.landscape;
+    }
   }
 }
