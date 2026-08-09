@@ -1,0 +1,31 @@
+# Flutter/Dart build output
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+
+# IDE/editor local state
+.idea/
+.vscode/
+
+# macOS Finder metadata
+.DS_Store
+
+# Xcode/CocoaPods generated files
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/ephemeral/
+macos/Pods/
+macos/.symlinks/
+macos/Flutter/ephemeral/
+
+# Android generated build output
+android/.gradle/
+android/app/build/
+
+# Local generated/runtime assets
+uploads/
+tests/
+generated_backgrounds/
+generated_backgrouds/

@@ -14,6 +14,64 @@ std::string WideToUtf8(const std::wstring &wide) {
     return utf8;
 }
 
+std::wstring Utf8ToWide(const std::string &utf8) {
+    if (utf8.empty()) {
+        return L"";
+    }
+    int size_needed = MultiByteToWideChar(CP_UTF8, 0, utf8.data(),
+                                          static_cast<int>(utf8.size()),
+                                          nullptr, 0);
+    if (size_needed <= 0) {
+        return std::wstring(utf8.begin(), utf8.end());
+    }
+    std::wstring wide(size_needed, 0);
+    MultiByteToWideChar(CP_UTF8, 0, utf8.data(), static_cast<int>(utf8.size()),
+                        wide.data(), size_needed);
+    return wide;
+}
+
+bool RunPrintUiCommand(const std::string &commandUtf8) {
+    const std::wstring parameters = Utf8ToWide(commandUtf8);
+    SHELLEXECUTEINFOW sei = { sizeof(SHELLEXECUTEINFOW) };
+    sei.fMask = SEE_MASK_NOCLOSEPROCESS;
+    sei.lpVerb = L"runas";
+    sei.lpFile = L"rundll32.exe";
+    sei.lpParameters = parameters.c_str();
+    sei.nShow = SW_HIDE;
+
+    std::cout << commandUtf8 << std::endl;
+    if (!ShellExecuteExW(&sei)) {
+        DWORD error = GetLastError();
+        std::wcerr << L"PrintUI command failed to launch. Error code: " << error << std::endl;
+        return false;
+    }
+    if (sei.hProcess == NULL) {
+        std::wcerr << L"PrintUI command did not return a process handle." << std::endl;
+        return false;
+    }
+
+    DWORD waitResult = WaitForSingleObject(sei.hProcess, 60000);
+    if (waitResult != WAIT_OBJECT_0) {
+        std::wcerr << L"PrintUI command did not finish. Wait result: " << waitResult << std::endl;
+        CloseHandle(sei.hProcess);
+        return false;
+    }
+
+    DWORD exitCode = 1;
+    if (!GetExitCodeProcess(sei.hProcess, &exitCode)) {
+        DWORD error = GetLastError();
+        std::wcerr << L"Could not read PrintUI exit code. Error code: " << error << std::endl;
+        CloseHandle(sei.hProcess);
+        return false;
+    }
+    CloseHandle(sei.hProcess);
+    if (exitCode != 0) {
+        std::wcerr << L"PrintUI command exited with code: " << exitCode << std::endl;
+        return false;
+    }
+    return true;
+}
+
 std::vector <JobInfo> GetPrintJobQueue(LPCWSTR printerName) {
     HANDLE hPrinter;
     PRINTER_DEFAULTS pd = {NULL, NULL, PRINTER_ACCESS_USE};
@@ -245,26 +303,11 @@ void methodHandlers(const flutter::MethodCall<> &call,
 
 
     } else if(call.method_name().compare("change_mode") == 0) {
-        const TCHAR* command = _T("rundll32.exe");
         const flutter::EncodableMap *argsList = std::get_if<flutter::EncodableMap>(
                 call.arguments());
         auto commandValue = (argsList->find(flutter::EncodableValue("command")))->second;
         std::string commandUtf8 = std::get<std::string>(commandValue);
-        std::wstring commandW(commandUtf8.begin(), commandUtf8.end());
-        const TCHAR* parameters = commandW.c_str();
-        // Execute the command as an administrator
-        SHELLEXECUTEINFO sei = { sizeof(SHELLEXECUTEINFO) };
-        sei.lpVerb = _T("runas");               // Run as administrator
-        sei.lpFile = command;                   // The program to execute
-        sei.lpParameters = parameters;          // The parameters for the program
-        sei.nShow = SW_SHOWNORMAL;              // Show the window
-
-        std::cout << commandUtf8 << std::endl;
-        if (ShellExecuteEx(&sei)) {
-            (*result)->Success(true);
-        } else {
-            (*result)->Success(false);
-        }
+        (*result)->Success(RunPrintUiCommand(commandUtf8));
 
     } else if (call.method_name().compare("get_printer_status") == 0) {
         const flutter::EncodableMap *argsList = std::get_if<flutter::EncodableMap>(

@@ -3,6 +3,7 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:project_l/common/enums/printer_cut_mode.dart';
 import 'package:project_l/common/enums/orientation_enum.dart';
 import 'package:project_l/common/constants/device_constants.dart';
 import 'package:project_l/common/log/log_utils.dart';
@@ -70,8 +71,25 @@ class _MyAppState extends State<MyApp> {
     final file = File(printFilePath);
     LogUtils.d('Print diagnostic start: ${file.path}');
     try {
-      final success = await getIt
-          .get<PrinterUtils>()
+      final printerUtils = getIt.get<PrinterUtils>();
+      final cutMode = _resolvePrintDiagnosticCutMode();
+      if (cutMode != null) {
+        LogUtils.d('Print diagnostic change cut mode: $cutMode');
+        final modeChanged = await printerUtils.changeCutMode(cutMode).timeout(
+              const Duration(seconds: 75),
+              onTimeout: () => false,
+            );
+        LogUtils.d('Print diagnostic change cut mode result=$modeChanged');
+        if (!modeChanged) {
+          appState.updatePrinterConnectionStatus(
+            connected: false,
+            errorCode: 'CUT_MODE_FAILED',
+          );
+          appState.sendPrinterStatusReport();
+          return;
+        }
+      }
+      final success = await printerUtils
           .printImage(
             file: file,
             numCut: 1,
@@ -85,6 +103,29 @@ class _MyAppState extends State<MyApp> {
     } catch (error, stackTrace) {
       LogUtils.e(error, stackTrace: stackTrace);
     }
+  }
+
+  PrinterCutMode? _resolvePrintDiagnosticCutMode() {
+    final rawValue =
+        Platform.environment['PTB_TEST_CUT_MODE']?.trim().toLowerCase();
+    switch (rawValue) {
+      case '2inch':
+      case '2_inch':
+      case 'twoinch':
+      case 'two_inch':
+      case 'cut':
+      case 'y':
+      case 'yes':
+      case 'true':
+        return PrinterCutMode.twoInch;
+      case 'standard':
+      case 'normal':
+      case 'n':
+      case 'no':
+      case 'false':
+        return PrinterCutMode.standard;
+    }
+    return null;
   }
 
   @override

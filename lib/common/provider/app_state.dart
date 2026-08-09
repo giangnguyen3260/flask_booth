@@ -238,29 +238,44 @@ class AppState extends ChangeNotifier with LogMixin {
   }
 
   Future<void> _loadRemoteData() async {
+    final stopwatch = Stopwatch()..start();
     AppData remoteData;
     if (_shouldUseFallbackAppData) {
       logD('Loading fallback app data from $_fallbackAppDataAsset');
       remoteData = await _loadFallbackAppData();
       await _applyPreparedAppData(await _prepareAppData(remoteData));
+      logD(
+          'Startup app data loaded from fallback in ${stopwatch.elapsedMilliseconds}ms');
       return;
     }
+
+    final localData = await _loadLocalAdminData();
+    if (localData != null) {
+      await _applyPreparedAppData(localData);
+      logD(
+          'Startup app data loaded from local cache in ${stopwatch.elapsedMilliseconds}ms');
+      return;
+    }
+
     try {
+      final apiStopwatch = Stopwatch()..start();
       remoteData = await restClient.initData();
+      logD('/pub/main-info completed in ${apiStopwatch.elapsedMilliseconds}ms');
+      final prepareStopwatch = Stopwatch()..start();
       final preparedData = await _prepareAppData(remoteData);
+      logD(
+          'Startup app data prepared in ${prepareStopwatch.elapsedMilliseconds}ms');
       await _saveAdminDataLocal(preparedData);
       await _applyPreparedAppData(preparedData);
+      logD(
+          'Startup app data loaded from remote in ${stopwatch.elapsedMilliseconds}ms');
     } catch (error, stackTrace) {
       logE(error, stackTrace: stackTrace);
-      final localData = await _loadLocalAdminData();
-      if (localData != null) {
-        logD('Loading local admin data cache');
-        await _applyPreparedAppData(localData);
-        return;
-      }
       logD('Loading fallback app data from $_fallbackAppDataAsset');
       remoteData = await _loadFallbackAppData();
       await _applyPreparedAppData(await _prepareAppData(remoteData));
+      logD(
+          'Startup app data loaded from fallback after remote error in ${stopwatch.elapsedMilliseconds}ms');
     }
   }
 
@@ -680,6 +695,12 @@ class AppState extends ChangeNotifier with LogMixin {
   void updatePrintQuantity(int quantity) {
     imageParam = imageParam.copyWith(
       printQuantity: quantity,
+    );
+  }
+
+  void updatePayableAmount(double amount) {
+    imageParam = imageParam.copyWith(
+      payableAmount: amount,
     );
   }
 

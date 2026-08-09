@@ -58,6 +58,7 @@ class _PaymentScreenScreenState extends BasePageState<PaymentScreenListenState,
   void afterFirstBuild() {
     super.afterFirstBuild();
     provider.totalPayable = widget.totalPrice;
+    appState.updatePayableAmount(widget.totalPrice);
   }
 
   @override

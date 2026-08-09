@@ -1648,6 +1648,14 @@ mixin _$Background {
   String? get bgNm => throw _privateConstructorUsedError;
   @JsonKey(name: 'bgUrl')
   String? get bgUrl => throw _privateConstructorUsedError;
+  @JsonKey(name: 'width')
+  int? get width => throw _privateConstructorUsedError;
+  @JsonKey(name: 'height')
+  int? get height => throw _privateConstructorUsedError;
+  @JsonKey(name: 'verticalYn')
+  String? get verticalYn => throw _privateConstructorUsedError;
+  @JsonKey(name: 'cutYn')
+  String? get cutYn => throw _privateConstructorUsedError;
   @JsonKey(name: 'transparent')
   List<List<double>>? get transparent => throw _privateConstructorUsedError;
   @JsonKey(name: 'maskJson')
@@ -1673,6 +1681,10 @@ abstract class $BackgroundCopyWith<$Res> {
       {@JsonKey(name: 'bgCd') String? bgCd,
       @JsonKey(name: 'bgNm') String? bgNm,
       @JsonKey(name: 'bgUrl') String? bgUrl,
+      @JsonKey(name: 'width') int? width,
+      @JsonKey(name: 'height') int? height,
+      @JsonKey(name: 'verticalYn') String? verticalYn,
+      @JsonKey(name: 'cutYn') String? cutYn,
       @JsonKey(name: 'transparent') List<List<double>>? transparent,
       @JsonKey(name: 'maskJson') List<BackgroundMaskArea>? maskJson});
 }
@@ -1695,6 +1707,10 @@ class _$BackgroundCopyWithImpl<$Res, $Val extends Background>
     Object? bgCd = freezed,
     Object? bgNm = freezed,
     Object? bgUrl = freezed,
+    Object? width = freezed,
+    Object? height = freezed,
+    Object? verticalYn = freezed,
+    Object? cutYn = freezed,
     Object? transparent = freezed,
     Object? maskJson = freezed,
   }) {
@@ -1710,6 +1726,22 @@ class _$BackgroundCopyWithImpl<$Res, $Val extends Background>
       bgUrl: freezed == bgUrl
           ? _value.bgUrl
           : bgUrl // ignore: cast_nullable_to_non_nullable
+              as String?,
+      width: freezed == width
+          ? _value.width
+          : width // ignore: cast_nullable_to_non_nullable
+              as int?,
+      height: freezed == height
+          ? _value.height
+          : height // ignore: cast_nullable_to_non_nullable
+              as int?,
+      verticalYn: freezed == verticalYn
+          ? _value.verticalYn
+          : verticalYn // ignore: cast_nullable_to_non_nullable
+              as String?,
+      cutYn: freezed == cutYn
+          ? _value.cutYn
+          : cutYn // ignore: cast_nullable_to_non_nullable
               as String?,
       transparent: freezed == transparent
           ? _value.transparent
@@ -1735,6 +1767,10 @@ abstract class _$$BackgroundImplCopyWith<$Res>
       {@JsonKey(name: 'bgCd') String? bgCd,
       @JsonKey(name: 'bgNm') String? bgNm,
       @JsonKey(name: 'bgUrl') String? bgUrl,
+      @JsonKey(name: 'width') int? width,
+      @JsonKey(name: 'height') int? height,
+      @JsonKey(name: 'verticalYn') String? verticalYn,
+      @JsonKey(name: 'cutYn') String? cutYn,
       @JsonKey(name: 'transparent') List<List<double>>? transparent,
       @JsonKey(name: 'maskJson') List<BackgroundMaskArea>? maskJson});
 }
@@ -1755,6 +1791,10 @@ class __$$BackgroundImplCopyWithImpl<$Res>
     Object? bgCd = freezed,
     Object? bgNm = freezed,
     Object? bgUrl = freezed,
+    Object? width = freezed,
+    Object? height = freezed,
+    Object? verticalYn = freezed,
+    Object? cutYn = freezed,
     Object? transparent = freezed,
     Object? maskJson = freezed,
   }) {
@@ -1770,6 +1810,22 @@ class __$$BackgroundImplCopyWithImpl<$Res>
       bgUrl: freezed == bgUrl
           ? _value.bgUrl
           : bgUrl // ignore: cast_nullable_to_non_nullable
+              as String?,
+      width: freezed == width
+          ? _value.width
+          : width // ignore: cast_nullable_to_non_nullable
+              as int?,
+      height: freezed == height
+          ? _value.height
+          : height // ignore: cast_nullable_to_non_nullable
+              as int?,
+      verticalYn: freezed == verticalYn
+          ? _value.verticalYn
+          : verticalYn // ignore: cast_nullable_to_non_nullable
+              as String?,
+      cutYn: freezed == cutYn
+          ? _value.cutYn
+          : cutYn // ignore: cast_nullable_to_non_nullable
               as String?,
       transparent: freezed == transparent
           ? _value._transparent
@@ -1790,6 +1846,10 @@ class _$BackgroundImpl extends _Background {
       {@JsonKey(name: 'bgCd') this.bgCd,
       @JsonKey(name: 'bgNm') this.bgNm,
       @JsonKey(name: 'bgUrl') this.bgUrl,
+      @JsonKey(name: 'width') this.width,
+      @JsonKey(name: 'height') this.height,
+      @JsonKey(name: 'verticalYn') this.verticalYn,
+      @JsonKey(name: 'cutYn') this.cutYn,
       @JsonKey(name: 'transparent') final List<List<double>>? transparent,
       @JsonKey(name: 'maskJson') final List<BackgroundMaskArea>? maskJson})
       : _transparent = transparent,
@@ -1808,6 +1868,18 @@ class _$BackgroundImpl extends _Background {
   @override
   @JsonKey(name: 'bgUrl')
   final String? bgUrl;
+  @override
+  @JsonKey(name: 'width')
+  final int? width;
+  @override
+  @JsonKey(name: 'height')
+  final int? height;
+  @override
+  @JsonKey(name: 'verticalYn')
+  final String? verticalYn;
+  @override
+  @JsonKey(name: 'cutYn')
+  final String? cutYn;
   final List<List<double>>? _transparent;
   @override
   @JsonKey(name: 'transparent')
@@ -1832,7 +1904,7 @@ class _$BackgroundImpl extends _Background {
 
   @override
   String toString() {
-    return 'Background(bgCd: $bgCd, bgNm: $bgNm, bgUrl: $bgUrl, transparent: $transparent, maskJson: $maskJson)';
+    return 'Background(bgCd: $bgCd, bgNm: $bgNm, bgUrl: $bgUrl, width: $width, height: $height, verticalYn: $verticalYn, cutYn: $cutYn, transparent: $transparent, maskJson: $maskJson)';
   }
 
   @override
@@ -1843,6 +1915,11 @@ class _$BackgroundImpl extends _Background {
             (identical(other.bgCd, bgCd) || other.bgCd == bgCd) &&
             (identical(other.bgNm, bgNm) || other.bgNm == bgNm) &&
             (identical(other.bgUrl, bgUrl) || other.bgUrl == bgUrl) &&
+            (identical(other.width, width) || other.width == width) &&
+            (identical(other.height, height) || other.height == height) &&
+            (identical(other.verticalYn, verticalYn) ||
+                other.verticalYn == verticalYn) &&
+            (identical(other.cutYn, cutYn) || other.cutYn == cutYn) &&
             const DeepCollectionEquality()
                 .equals(other._transparent, _transparent) &&
             const DeepCollectionEquality().equals(other._maskJson, _maskJson));
@@ -1855,6 +1932,10 @@ class _$BackgroundImpl extends _Background {
       bgCd,
       bgNm,
       bgUrl,
+      width,
+      height,
+      verticalYn,
+      cutYn,
       const DeepCollectionEquality().hash(_transparent),
       const DeepCollectionEquality().hash(_maskJson));
 
@@ -1879,6 +1960,10 @@ abstract class _Background extends Background {
       {@JsonKey(name: 'bgCd') final String? bgCd,
       @JsonKey(name: 'bgNm') final String? bgNm,
       @JsonKey(name: 'bgUrl') final String? bgUrl,
+      @JsonKey(name: 'width') final int? width,
+      @JsonKey(name: 'height') final int? height,
+      @JsonKey(name: 'verticalYn') final String? verticalYn,
+      @JsonKey(name: 'cutYn') final String? cutYn,
       @JsonKey(name: 'transparent') final List<List<double>>? transparent,
       @JsonKey(name: 'maskJson')
       final List<BackgroundMaskArea>? maskJson}) = _$BackgroundImpl;
@@ -1896,6 +1981,18 @@ abstract class _Background extends Background {
   @override
   @JsonKey(name: 'bgUrl')
   String? get bgUrl;
+  @override
+  @JsonKey(name: 'width')
+  int? get width;
+  @override
+  @JsonKey(name: 'height')
+  int? get height;
+  @override
+  @JsonKey(name: 'verticalYn')
+  String? get verticalYn;
+  @override
+  @JsonKey(name: 'cutYn')
+  String? get cutYn;
   @override
   @JsonKey(name: 'transparent')
   List<List<double>>? get transparent;
@@ -2181,6 +2278,8 @@ mixin _$FrameSetting {
   int? get addPhotoNumber => throw _privateConstructorUsedError;
   @JsonKey(name: 'addPhotoLimit')
   int? get addPhotoLimit => throw _privateConstructorUsedError;
+  @JsonKey(name: 'captureAspectRatio')
+  String? get captureAspectRatio => throw _privateConstructorUsedError;
 
   /// Serializes this FrameSetting to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -2204,7 +2303,8 @@ abstract class $FrameSettingCopyWith<$Res> {
       @JsonKey(name: 'timePerShot') int? timePerShot,
       @JsonKey(name: 'additionPrice') double? additionPrice,
       @JsonKey(name: 'addPhotoNumber') int? addPhotoNumber,
-      @JsonKey(name: 'addPhotoLimit') int? addPhotoLimit});
+      @JsonKey(name: 'addPhotoLimit') int? addPhotoLimit,
+      @JsonKey(name: 'captureAspectRatio') String? captureAspectRatio});
 }
 
 /// @nodoc
@@ -2228,6 +2328,7 @@ class _$FrameSettingCopyWithImpl<$Res, $Val extends FrameSetting>
     Object? additionPrice = freezed,
     Object? addPhotoNumber = freezed,
     Object? addPhotoLimit = freezed,
+    Object? captureAspectRatio = freezed,
   }) {
     return _then(_value.copyWith(
       numOfPhotos: freezed == numOfPhotos
@@ -2254,6 +2355,10 @@ class _$FrameSettingCopyWithImpl<$Res, $Val extends FrameSetting>
           ? _value.addPhotoLimit
           : addPhotoLimit // ignore: cast_nullable_to_non_nullable
               as int?,
+      captureAspectRatio: freezed == captureAspectRatio
+          ? _value.captureAspectRatio
+          : captureAspectRatio // ignore: cast_nullable_to_non_nullable
+              as String?,
     ) as $Val);
   }
 }
@@ -2272,7 +2377,8 @@ abstract class _$$FrameSettingImplCopyWith<$Res>
       @JsonKey(name: 'timePerShot') int? timePerShot,
       @JsonKey(name: 'additionPrice') double? additionPrice,
       @JsonKey(name: 'addPhotoNumber') int? addPhotoNumber,
-      @JsonKey(name: 'addPhotoLimit') int? addPhotoLimit});
+      @JsonKey(name: 'addPhotoLimit') int? addPhotoLimit,
+      @JsonKey(name: 'captureAspectRatio') String? captureAspectRatio});
 }
 
 /// @nodoc
@@ -2294,6 +2400,7 @@ class __$$FrameSettingImplCopyWithImpl<$Res>
     Object? additionPrice = freezed,
     Object? addPhotoNumber = freezed,
     Object? addPhotoLimit = freezed,
+    Object? captureAspectRatio = freezed,
   }) {
     return _then(_$FrameSettingImpl(
       numOfPhotos: freezed == numOfPhotos
@@ -2320,6 +2427,10 @@ class __$$FrameSettingImplCopyWithImpl<$Res>
           ? _value.addPhotoLimit
           : addPhotoLimit // ignore: cast_nullable_to_non_nullable
               as int?,
+      captureAspectRatio: freezed == captureAspectRatio
+          ? _value.captureAspectRatio
+          : captureAspectRatio // ignore: cast_nullable_to_non_nullable
+              as String?,
     ));
   }
 }
@@ -2333,7 +2444,8 @@ class _$FrameSettingImpl implements _FrameSetting {
       @JsonKey(name: 'timePerShot') this.timePerShot,
       @JsonKey(name: 'additionPrice') this.additionPrice,
       @JsonKey(name: 'addPhotoNumber') this.addPhotoNumber,
-      @JsonKey(name: 'addPhotoLimit') this.addPhotoLimit});
+      @JsonKey(name: 'addPhotoLimit') this.addPhotoLimit,
+      @JsonKey(name: 'captureAspectRatio') this.captureAspectRatio});
 
   factory _$FrameSettingImpl.fromJson(Map<String, dynamic> json) =>
       _$$FrameSettingImplFromJson(json);
@@ -2356,10 +2468,13 @@ class _$FrameSettingImpl implements _FrameSetting {
   @override
   @JsonKey(name: 'addPhotoLimit')
   final int? addPhotoLimit;
+  @override
+  @JsonKey(name: 'captureAspectRatio')
+  final String? captureAspectRatio;
 
   @override
   String toString() {
-    return 'FrameSetting(numOfPhotos: $numOfPhotos, shortCount: $shortCount, timePerShot: $timePerShot, additionPrice: $additionPrice, addPhotoNumber: $addPhotoNumber, addPhotoLimit: $addPhotoLimit)';
+    return 'FrameSetting(numOfPhotos: $numOfPhotos, shortCount: $shortCount, timePerShot: $timePerShot, additionPrice: $additionPrice, addPhotoNumber: $addPhotoNumber, addPhotoLimit: $addPhotoLimit, captureAspectRatio: $captureAspectRatio)';
   }
 
   @override
@@ -2378,13 +2493,22 @@ class _$FrameSettingImpl implements _FrameSetting {
             (identical(other.addPhotoNumber, addPhotoNumber) ||
                 other.addPhotoNumber == addPhotoNumber) &&
             (identical(other.addPhotoLimit, addPhotoLimit) ||
-                other.addPhotoLimit == addPhotoLimit));
+                other.addPhotoLimit == addPhotoLimit) &&
+            (identical(other.captureAspectRatio, captureAspectRatio) ||
+                other.captureAspectRatio == captureAspectRatio));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  int get hashCode => Object.hash(runtimeType, numOfPhotos, shortCount,
-      timePerShot, additionPrice, addPhotoNumber, addPhotoLimit);
+  int get hashCode => Object.hash(
+      runtimeType,
+      numOfPhotos,
+      shortCount,
+      timePerShot,
+      additionPrice,
+      addPhotoNumber,
+      addPhotoLimit,
+      captureAspectRatio);
 
   /// Create a copy of FrameSetting
   /// with the given fields replaced by the non-null parameter values.
@@ -2404,13 +2528,14 @@ class _$FrameSettingImpl implements _FrameSetting {
 
 abstract class _FrameSetting implements FrameSetting {
   const factory _FrameSetting(
-          {@JsonKey(name: 'numOfPhotos') final int? numOfPhotos,
-          @JsonKey(name: 'shotCount') final int? shortCount,
-          @JsonKey(name: 'timePerShot') final int? timePerShot,
-          @JsonKey(name: 'additionPrice') final double? additionPrice,
-          @JsonKey(name: 'addPhotoNumber') final int? addPhotoNumber,
-          @JsonKey(name: 'addPhotoLimit') final int? addPhotoLimit}) =
-      _$FrameSettingImpl;
+      {@JsonKey(name: 'numOfPhotos') final int? numOfPhotos,
+      @JsonKey(name: 'shotCount') final int? shortCount,
+      @JsonKey(name: 'timePerShot') final int? timePerShot,
+      @JsonKey(name: 'additionPrice') final double? additionPrice,
+      @JsonKey(name: 'addPhotoNumber') final int? addPhotoNumber,
+      @JsonKey(name: 'addPhotoLimit') final int? addPhotoLimit,
+      @JsonKey(name: 'captureAspectRatio')
+      final String? captureAspectRatio}) = _$FrameSettingImpl;
 
   factory _FrameSetting.fromJson(Map<String, dynamic> json) =
       _$FrameSettingImpl.fromJson;
@@ -2433,6 +2558,9 @@ abstract class _FrameSetting implements FrameSetting {
   @override
   @JsonKey(name: 'addPhotoLimit')
   int? get addPhotoLimit;
+  @override
+  @JsonKey(name: 'captureAspectRatio')
+  String? get captureAspectRatio;
 
   /// Create a copy of FrameSetting
   /// with the given fields replaced by the non-null parameter values.

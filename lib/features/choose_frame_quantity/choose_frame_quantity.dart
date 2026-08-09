@@ -46,6 +46,7 @@ class _ChooseFrameQuantityScreenState extends BasePageState<
   void onNext(ChooseFrameQuantityProvider provider) {
     super.onNext(provider);
     appState.updatePrintQuantity(provider.frameQty);
+    appState.updatePayableAmount(provider.totalPrice);
     navigator.push(PaymentRouteRoute(totalPrice: provider.totalPrice));
   }
 

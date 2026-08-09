@@ -26,6 +26,7 @@ mixin _$ImageParam {
   ColorFilterGenerator? get colorFilter => throw _privateConstructorUsedError;
   Effect? get effect => throw _privateConstructorUsedError;
   int get printQuantity => throw _privateConstructorUsedError;
+  double get payableAmount => throw _privateConstructorUsedError;
   String? get couponCode => throw _privateConstructorUsedError;
 
   /// Create a copy of ImageParam
@@ -52,6 +53,7 @@ abstract class $ImageParamCopyWith<$Res> {
       ColorFilterGenerator? colorFilter,
       Effect? effect,
       int printQuantity,
+      double payableAmount,
       String? couponCode});
 
   $FramesInfoCopyWith<$Res> get selectedFrame;
@@ -84,6 +86,7 @@ class _$ImageParamCopyWithImpl<$Res, $Val extends ImageParam>
     Object? colorFilter = freezed,
     Object? effect = freezed,
     Object? printQuantity = null,
+    Object? payableAmount = null,
     Object? couponCode = freezed,
   }) {
     return _then(_value.copyWith(
@@ -127,6 +130,10 @@ class _$ImageParamCopyWithImpl<$Res, $Val extends ImageParam>
           ? _value.printQuantity
           : printQuantity // ignore: cast_nullable_to_non_nullable
               as int,
+      payableAmount: null == payableAmount
+          ? _value.payableAmount
+          : payableAmount // ignore: cast_nullable_to_non_nullable
+              as double,
       couponCode: freezed == couponCode
           ? _value.couponCode
           : couponCode // ignore: cast_nullable_to_non_nullable
@@ -188,6 +195,7 @@ abstract class _$$ImageParamImplCopyWith<$Res>
       ColorFilterGenerator? colorFilter,
       Effect? effect,
       int printQuantity,
+      double payableAmount,
       String? couponCode});
 
   @override
@@ -221,6 +229,7 @@ class __$$ImageParamImplCopyWithImpl<$Res>
     Object? colorFilter = freezed,
     Object? effect = freezed,
     Object? printQuantity = null,
+    Object? payableAmount = null,
     Object? couponCode = freezed,
   }) {
     return _then(_$ImageParamImpl(
@@ -264,6 +273,10 @@ class __$$ImageParamImplCopyWithImpl<$Res>
           ? _value.printQuantity
           : printQuantity // ignore: cast_nullable_to_non_nullable
               as int,
+      payableAmount: null == payableAmount
+          ? _value.payableAmount
+          : payableAmount // ignore: cast_nullable_to_non_nullable
+              as double,
       couponCode: freezed == couponCode
           ? _value.couponCode
           : couponCode // ignore: cast_nullable_to_non_nullable
@@ -286,6 +299,7 @@ class _$ImageParamImpl implements _ImageParam {
       this.colorFilter,
       this.effect,
       this.printQuantity = 0,
+      this.payableAmount = 0,
       this.couponCode})
       : _images = images,
         _videos = videos,
@@ -338,11 +352,14 @@ class _$ImageParamImpl implements _ImageParam {
   @JsonKey()
   final int printQuantity;
   @override
+  @JsonKey()
+  final double payableAmount;
+  @override
   final String? couponCode;
 
   @override
   String toString() {
-    return 'ImageParam(session: $session, images: $images, videos: $videos, isFlipped: $isFlipped, selectedFrame: $selectedFrame, selectedBackground: $selectedBackground, pansAndScales: $pansAndScales, colorFilter: $colorFilter, effect: $effect, printQuantity: $printQuantity, couponCode: $couponCode)';
+    return 'ImageParam(session: $session, images: $images, videos: $videos, isFlipped: $isFlipped, selectedFrame: $selectedFrame, selectedBackground: $selectedBackground, pansAndScales: $pansAndScales, colorFilter: $colorFilter, effect: $effect, printQuantity: $printQuantity, payableAmount: $payableAmount, couponCode: $couponCode)';
   }
 
   @override
@@ -366,6 +383,8 @@ class _$ImageParamImpl implements _ImageParam {
             (identical(other.effect, effect) || other.effect == effect) &&
             (identical(other.printQuantity, printQuantity) ||
                 other.printQuantity == printQuantity) &&
+            (identical(other.payableAmount, payableAmount) ||
+                other.payableAmount == payableAmount) &&
             (identical(other.couponCode, couponCode) ||
                 other.couponCode == couponCode));
   }
@@ -383,6 +402,7 @@ class _$ImageParamImpl implements _ImageParam {
       colorFilter,
       effect,
       printQuantity,
+      payableAmount,
       couponCode);
 
   /// Create a copy of ImageParam
@@ -406,6 +426,7 @@ abstract class _ImageParam implements ImageParam {
       final ColorFilterGenerator? colorFilter,
       final Effect? effect,
       final int printQuantity,
+      final double payableAmount,
       final String? couponCode}) = _$ImageParamImpl;
 
   @override
@@ -428,6 +449,8 @@ abstract class _ImageParam implements ImageParam {
   Effect? get effect;
   @override
   int get printQuantity;
+  @override
+  double get payableAmount;
   @override
   String? get couponCode;
 

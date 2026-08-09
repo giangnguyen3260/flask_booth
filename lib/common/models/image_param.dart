@@ -19,6 +19,7 @@ class ImageParam with _$ImageParam {
     ColorFilterGenerator? colorFilter,
     Effect? effect,
     @Default(0) int printQuantity,
+    @Default(0) double payableAmount,
     String? couponCode,
   }) = _ImageParam;
 }

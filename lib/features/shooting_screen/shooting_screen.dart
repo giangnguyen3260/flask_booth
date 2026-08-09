@@ -51,6 +51,10 @@ class _ShootingScreenState extends BasePageState<ShootingScreenListenState,
   late final int shootingTime =
       appState.imageParam.selectedFrame.frameSetting?.timePerShot ?? 10;
 
+  late final EAspectRatio captureAspectRatio = EAspectRatio.fromString(
+    appState.imageParam.selectedFrame.frameSetting?.captureAspectRatio,
+  );
+
   late final CommonCounterController _commonCounterController =
       CommonCounterController(defaultTime: shootingTime);
 
@@ -110,6 +114,12 @@ class _ShootingScreenState extends BasePageState<ShootingScreenListenState,
           logD('Canon saveToHost=$savedToHost');
           _hasCanonSession = opened;
           if (opened) {
+            final aspectRatioUpdated =
+                await appState.cameraUtils.setAspectRatio(
+              captureAspectRatio.getSDKCode(),
+            );
+            logD(
+                'Canon setAspectRatio=${captureAspectRatio.value} result=$aspectRatioUpdated');
             final previewStarted = await appState.cameraUtils.startPreview();
             logD('Canon startPreview=$previewStarted');
             if (previewStarted) {
@@ -545,9 +555,6 @@ class _ShootingScreenState extends BasePageState<ShootingScreenListenState,
 
   @override
   Widget buildPage(BuildContext context, maxWidth, maxHeight) {
-    var isVertical = appState.isMockCameraMode
-        ? false
-        : appState.imageParam.selectedFrame.isVertical();
     return Scaffold(
       backgroundColor: Colors.black,
       body: ListenableBuilder(
@@ -561,6 +568,7 @@ class _ShootingScreenState extends BasePageState<ShootingScreenListenState,
                 children: [
                   Positioned.fill(
                     child: _CameraCaptureLayout(
+                      captureAspectRatio: captureAspectRatio,
                       secondsLeft: _readyCounterController.currentCounter,
                       shotCount: provider.uiImages.length,
                       totalShots: shotCount,
@@ -584,9 +592,7 @@ class _ShootingScreenState extends BasePageState<ShootingScreenListenState,
                           ),
                           if (!isMockCameraMode && controller != null)
                             Positioned.fill(
-                              child: EAspectRatio.sixteenNine.coverWidget(
-                                isVertical: isVertical,
-                              ),
+                              child: captureAspectRatio.coverWidget(),
                             ),
                         ],
                       ),
@@ -634,6 +640,7 @@ class _ShootingScreenState extends BasePageState<ShootingScreenListenState,
                         ),
                       )
                     : _CameraCaptureLayout(
+                        captureAspectRatio: captureAspectRatio,
                         secondsLeft: _commonCounterController.currentCounter,
                         shotCount: provider.uiImages.length,
                         totalShots: shotCount,
@@ -657,9 +664,7 @@ class _ShootingScreenState extends BasePageState<ShootingScreenListenState,
                             ),
                             if (!isMockCameraMode && controller != null)
                               Positioned.fill(
-                                child: EAspectRatio.sixteenNine.coverWidget(
-                                  isVertical: isVertical,
-                                ),
+                                child: captureAspectRatio.coverWidget(),
                               ),
                             Positioned(
                               bottom: 20.h,
@@ -736,12 +741,14 @@ class _ShootingCanvas extends StatelessWidget {
 
 class _CameraCaptureLayout extends StatelessWidget {
   const _CameraCaptureLayout({
+    required this.captureAspectRatio,
     required this.secondsLeft,
     required this.shotCount,
     required this.totalShots,
     required this.preview,
   });
 
+  final EAspectRatio captureAspectRatio;
   final int secondsLeft;
   final int shotCount;
   final int totalShots;
@@ -753,11 +760,12 @@ class _CameraCaptureLayout extends StatelessWidget {
       builder: (context, constraints) {
         final maxPreviewWidth = constraints.maxWidth;
         final maxPreviewHeight = constraints.maxHeight;
+        final aspectRatio = captureAspectRatio.aspectRatio;
         var previewWidth = maxPreviewWidth;
-        var previewHeight = previewWidth / 16 * 9;
+        var previewHeight = previewWidth / aspectRatio;
         if (previewHeight > maxPreviewHeight) {
           previewHeight = maxPreviewHeight;
-          previewWidth = previewHeight / 9 * 16;
+          previewWidth = previewHeight * aspectRatio;
         }
         return Stack(
           children: [

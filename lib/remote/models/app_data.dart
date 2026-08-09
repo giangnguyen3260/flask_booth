@@ -189,6 +189,10 @@ class Background with _$Background {
     @JsonKey(name: 'bgCd') String? bgCd,
     @JsonKey(name: 'bgNm') String? bgNm,
     @JsonKey(name: 'bgUrl') String? bgUrl,
+    @JsonKey(name: 'width') int? width,
+    @JsonKey(name: 'height') int? height,
+    @JsonKey(name: 'verticalYn') String? verticalYn,
+    @JsonKey(name: 'cutYn') String? cutYn,
     @JsonKey(name: 'transparent') List<List<double>>? transparent,
     @JsonKey(name: 'maskJson') List<BackgroundMaskArea>? maskJson,
   }) = _Background;
@@ -202,6 +206,14 @@ class Background with _$Background {
 
   List<List<double>> getTransparentAreas() {
     return transparent ?? [];
+  }
+
+  bool isHorizontalForPrint() {
+    return (verticalYn ?? '').toUpperCase() == 'N';
+  }
+
+  bool isCut() {
+    return (cutYn ?? '').toUpperCase() == 'Y';
   }
 }
 
@@ -233,6 +245,7 @@ class FrameSetting with _$FrameSetting {
     @JsonKey(name: 'additionPrice') double? additionPrice,
     @JsonKey(name: 'addPhotoNumber') int? addPhotoNumber,
     @JsonKey(name: 'addPhotoLimit') int? addPhotoLimit,
+    @JsonKey(name: 'captureAspectRatio') String? captureAspectRatio,
   }) = _FrameSetting;
 
   factory FrameSetting.fromJson(Map<String, Object?> json) =>

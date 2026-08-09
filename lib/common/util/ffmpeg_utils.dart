@@ -444,6 +444,37 @@ class FfmpegUtils {
     return imageOutput;
   }
 
+  Future<String> rotateImage90DegreesForPrint(
+      {required String imagePath}) async {
+    final imageOutput = path.join(
+      _savedImagePath,
+      "Print_Rotated_${DateTimeUtils.format(date: DateTime.now(), format: "dd_MM_yyyy_HH_mm_ss")}.png",
+    );
+
+    final outputFile = await FFMpegHelper.instance.runSync(
+      FFMpegCommand(outputFilepath: imageOutput, inputs: [
+        FFMpegInput([
+          '-i',
+          imagePath,
+          '-vf',
+          'transpose=1',
+          '-frames:v',
+          '1',
+          '-c:v',
+          'png',
+          '-compression_level',
+          '1',
+          '-y',
+        ]),
+      ]),
+      timeout: const Duration(seconds: 30),
+    );
+    if (outputFile == null || !outputFile.existsSync()) {
+      throw StateError('FFmpeg print image rotate failed: $imagePath');
+    }
+    return imageOutput;
+  }
+
   Future<String> overlayQrOnImage({
     required String imagePath,
     required List<int> qrBytes,

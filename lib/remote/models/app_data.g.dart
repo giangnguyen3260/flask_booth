@@ -133,6 +133,10 @@ _$BackgroundImpl _$$BackgroundImplFromJson(Map<String, dynamic> json) =>
       bgCd: json['bgCd'] as String?,
       bgNm: json['bgNm'] as String?,
       bgUrl: json['bgUrl'] as String?,
+      width: (json['width'] as num?)?.toInt(),
+      height: (json['height'] as num?)?.toInt(),
+      verticalYn: json['verticalYn'] as String?,
+      cutYn: json['cutYn'] as String?,
       transparent: (json['transparent'] as List<dynamic>?)
           ?.map((e) =>
               (e as List<dynamic>).map((e) => (e as num).toDouble()).toList())
@@ -147,6 +151,10 @@ Map<String, dynamic> _$$BackgroundImplToJson(_$BackgroundImpl instance) =>
       'bgCd': instance.bgCd,
       'bgNm': instance.bgNm,
       'bgUrl': instance.bgUrl,
+      'width': instance.width,
+      'height': instance.height,
+      'verticalYn': instance.verticalYn,
+      'cutYn': instance.cutYn,
       'transparent': instance.transparent,
       'maskJson': instance.maskJson,
     };
@@ -179,6 +187,7 @@ _$FrameSettingImpl _$$FrameSettingImplFromJson(Map<String, dynamic> json) =>
       additionPrice: (json['additionPrice'] as num?)?.toDouble(),
       addPhotoNumber: (json['addPhotoNumber'] as num?)?.toInt(),
       addPhotoLimit: (json['addPhotoLimit'] as num?)?.toInt(),
+      captureAspectRatio: json['captureAspectRatio'] as String?,
     );
 
 Map<String, dynamic> _$$FrameSettingImplToJson(_$FrameSettingImpl instance) =>
@@ -189,4 +198,5 @@ Map<String, dynamic> _$$FrameSettingImplToJson(_$FrameSettingImpl instance) =>
       'additionPrice': instance.additionPrice,
       'addPhotoNumber': instance.addPhotoNumber,
       'addPhotoLimit': instance.addPhotoLimit,
+      'captureAspectRatio': instance.captureAspectRatio,
     };

@@ -95,6 +95,7 @@ class PaymentScreenProvider extends BaseProvider<PaymentScreenListenState> {
             .clamp(0, beforeDiscount);
       }
       appState.updateCoupon(couponDetail.code ?? '');
+      appState.updatePayableAmount(totalPayable);
       notifyListeners();
       checkMoneyValue();
     }

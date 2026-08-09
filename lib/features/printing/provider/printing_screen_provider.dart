@@ -90,7 +90,7 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
       var printingImage = "";
       var uploadImage = "";
 
-      var isCut = appState.imageParam.selectedFrame.isCut();
+      final isCut = _resolvePrintCutMode();
       final frameOverlaySourcePath =
           appState.imageParam.selectedFrame.frameUrlTempDis ??
               appState.imageParam.selectedFrame.frameUrl ??
@@ -118,13 +118,14 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
         logD(
           'Printing mock export image: $mockImage videos=${mockVideoPaths.length}',
         );
+        final paidAmount = _resolvePaidAmount();
         final response = await appState.submitOrQueueResult(
             saleNo: appState.imageParam.session,
             cuKey: appState.imageParam.couponCode,
             frameId: appState.imageParam.selectedFrame.frameCd ?? '',
             imagePath: uploadImage,
             videoPaths: mockVideoPaths,
-            amount: appState.imageParam.selectedFrame.price ?? 0,
+            amount: paidAmount,
             printQuantity: appState.imageParam.printQuantity,
             uploadNow: false);
 
@@ -171,6 +172,14 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
             await _printerUtils.changeCutMode(PrinterCutMode.twoInch);
         if (!cutModeChanged) {
           logE('Printing change cut mode failed: twoInch');
+          preparationStatus = 'Printer cut mode failed';
+          appState.updatePrinterConnectionStatus(
+            connected: false,
+            errorCode: 'CUT_MODE_FAILED',
+          );
+          appState.sendPrinterStatusReport();
+          notifyListeners();
+          return false;
         }
 
         preparationStatus = 'Merging print image...';
@@ -196,6 +205,14 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
             await _printerUtils.changeCutMode(PrinterCutMode.standard);
         if (!cutModeChanged) {
           logE('Printing change cut mode failed: standard');
+          preparationStatus = 'Printer cut mode failed';
+          appState.updatePrinterConnectionStatus(
+            connected: false,
+            errorCode: 'CUT_MODE_FAILED',
+          );
+          appState.sendPrinterStatusReport();
+          notifyListeners();
+          return false;
         }
 
         preparationStatus = 'Merging print image...';
@@ -226,13 +243,14 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
       preparationStatus = 'Saving upload for later...';
       notifyListeners();
       logD('Printing queue upload start');
+      final paidAmount = _resolvePaidAmount();
       final response = await appState.submitOrQueueResult(
           saleNo: appState.imageParam.session,
           cuKey: appState.imageParam.couponCode,
           frameId: appState.imageParam.selectedFrame.frameCd ?? '',
           imagePath: uploadImage,
           videoPaths: videoPaths,
-          amount: appState.imageParam.selectedFrame.price ?? 0,
+          amount: paidAmount,
           printQuantity: appState.imageParam.printQuantity,
           uploadNow: false);
 
@@ -254,6 +272,19 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
           logD('Printing overlay QR done: $printingImage');
         }
       }
+      var printJobImage = printingImage;
+      if (_shouldRotatePrintImage()) {
+        preparationStatus = 'Rotating print image...';
+        notifyListeners();
+        logD(
+          'Printing rotate image for horizontal background: $printingImage',
+        );
+        printJobImage = await _ffmpegUtils.rotateImage90DegreesForPrint(
+          imagePath: printingImage,
+        );
+        logD('Printing rotate image done: $printJobImage');
+      }
+      finalPrintImagePath = printJobImage;
       preparationStatus = isUploadQueued ? 'Waiting to upload when online' : '';
       logD(
         'Printing queue upload done: queued=$isUploadQueued qrUrl=${qrUrl.isNotEmpty}',
@@ -263,13 +294,13 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
       try {
         preparationStatus = 'Sending print job...';
         notifyListeners();
-        final orientation = await _resolvePrintImageOrientation(printingImage);
+        final orientation = await _resolvePrintImageOrientation(printJobImage);
         final printCopies = _resolvePrintCopies(isCut: isCut);
         logD(
-            'Printing print job start: $printingImage orientation=$orientation');
+            'Printing print job start: $printJobImage orientation=$orientation');
         final printQueued = await _printerUtils
             .printImage(
-              file: File(printingImage),
+              file: File(printJobImage),
               numCut: printCopies,
               orientation: orientation,
             )
@@ -449,10 +480,30 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
     return videoPaths;
   }
 
+  bool _resolvePrintCutMode() {
+    final selectedBackground = appState.imageParam.selectedBackground;
+    if ((selectedBackground.cutYn ?? '').trim().isNotEmpty) {
+      return selectedBackground.isCut();
+    }
+    return appState.imageParam.selectedFrame.isCut();
+  }
+
+  bool _shouldRotatePrintImage() {
+    return appState.imageParam.selectedBackground.isHorizontalForPrint();
+  }
+
   int _resolvePrintCopies({required bool isCut}) {
     final quantity = appState.imageParam.printQuantity;
     final copies = isCut ? (quantity / 2).ceil() : quantity;
     return copies < 1 ? 1 : copies;
+  }
+
+  double _resolvePaidAmount() {
+    final paidAmount = appState.imageParam.payableAmount;
+    if (paidAmount > 0) {
+      return paidAmount;
+    }
+    return appState.imageParam.selectedFrame.price ?? 0;
   }
 
   Future<OrientationEnum> _resolvePrintImageOrientation(
