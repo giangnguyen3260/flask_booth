@@ -20,9 +20,15 @@ class BackgroundMaskUtils {
 
     final cacheKey =
         '$sourcePath::${jsonEncode(zones.map((e) => e.toJson()).toList())}';
+    final cachePath = _cachePathFor(cacheKey);
     final cached = _cache[cacheKey];
     if (cached != null && await File(cached).exists()) {
       return cached;
+    }
+    final existingCachePath = await _existingCachePathFor(cacheKey);
+    if (existingCachePath != null) {
+      _cache[cacheKey] = existingCachePath;
+      return existingCachePath;
     }
 
     final bytes = await _readBytes(sourcePath);
@@ -68,12 +74,37 @@ class BackgroundMaskUtils {
       }
     }
 
-    final cacheDir = '${Directory.systemTemp.path}/ptb_background_masks';
-    final cachePath = '$cacheDir/masked_${cacheKey.hashCode}.png';
-    await Directory(cacheDir).create(recursive: true);
+    await Directory(_cacheDir).create(recursive: true);
     await File(cachePath).writeAsBytes(img.encodePng(canvas), flush: true);
     _cache[cacheKey] = cachePath;
     return cachePath;
+  }
+
+  String get _cacheDir => '${Directory.systemTemp.path}/ptb_background_masks';
+
+  String _cachePathFor(String cacheKey) {
+    return '$_cacheDir/masked_${_stableHash(cacheKey)}.png';
+  }
+
+  String _stableHash(String value) {
+    var hash = 0x811c9dc5;
+    for (final byte in utf8.encode(value)) {
+      hash ^= byte;
+      hash = (hash * 0x01000193) & 0xFFFFFFFF;
+    }
+    return hash.toRadixString(16).padLeft(8, '0');
+  }
+
+  Future<String?> _existingCachePathFor(String cacheKey) async {
+    final cachePath = _cachePathFor(cacheKey);
+    if (await File(cachePath).exists()) {
+      return cachePath;
+    }
+    final legacyCachePath = '$_cacheDir/masked_${cacheKey.hashCode}.png';
+    if (await File(legacyCachePath).exists()) {
+      return legacyCachePath;
+    }
+    return null;
   }
 
   Future<Uint8List> _readBytes(String sourcePath) async {

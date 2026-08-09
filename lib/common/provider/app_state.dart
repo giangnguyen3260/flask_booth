@@ -44,6 +44,10 @@ class AppState extends ChangeNotifier with LogMixin {
   static const String _fallbackBackgroundIconAsset =
       'assets/branding/flashy_booth_logo.jpg';
   static const Duration adminUpdateCheckInterval = Duration(minutes: 5);
+  static const Duration _startupRemoteDataTimeout = Duration(seconds: 12);
+  static const Duration _adminDataReloadTimeout = Duration(seconds: 20);
+  static const Duration _adminVersionCheckTimeout = Duration(seconds: 8);
+  static const int _assetResolveBatchSize = 12;
 
   Locale locate = const Locale("vi");
   final RemoteImageUtils remoteImageUtils;
@@ -70,6 +74,7 @@ class AppState extends ChangeNotifier with LogMixin {
   final CameraUtils cameraUtils = getIt.get();
   async.Timer? _heartbeatTimer;
   bool _isExecutingPrintCommand = false;
+  bool _isRetryingPendingUploads = false;
   String activeAdminDataVersion = '';
   String latestAdminDataVersion = '';
   bool hasPendingAdminUpdate = false;
@@ -258,9 +263,7 @@ class AppState extends ChangeNotifier with LogMixin {
     }
 
     try {
-      final apiStopwatch = Stopwatch()..start();
-      remoteData = await restClient.initData();
-      logD('/pub/main-info completed in ${apiStopwatch.elapsedMilliseconds}ms');
+      remoteData = await _fetchRemoteAppData(_startupRemoteDataTimeout);
       final prepareStopwatch = Stopwatch()..start();
       final preparedData = await _prepareAppData(remoteData);
       logD(
@@ -285,55 +288,120 @@ class AppState extends ChangeNotifier with LogMixin {
     return AppData.fromJson(jsonMap);
   }
 
-  Future<AppData> _prepareAppData(AppData remoteData) async {
-    final List<FramesInfo> tempData = [];
-    for (FramesInfo frameInfo in remoteData.framesInfo ?? []) {
-      final tempFramePath =
-          await _resolveOptionalImagePath(frameInfo.frameUrlTempDis);
-      final mainFramePath = await _resolveOptionalImagePath(frameInfo.frameUrl);
+  Future<AppData> _fetchRemoteAppData(Duration timeout) async {
+    final apiStopwatch = Stopwatch()..start();
+    final remoteData = await restClient.initData().timeout(timeout);
+    logD(
+      '/pub/main-info completed in ${apiStopwatch.elapsedMilliseconds}ms '
+      '(timeout=${timeout.inSeconds}s)',
+    );
+    return remoteData;
+  }
 
-      frameInfo = frameInfo.copyWith(
-        frameUrlTempDis: tempFramePath,
-        frameUrl: mainFramePath ?? tempFramePath,
-      );
-      List<BackgroundInfo> tempBackgroundInfo = [];
-      for (BackgroundInfo backgroundCategory
-          in (frameInfo.backgroundInfo ?? [])) {
-        final backgroundCateFilePath =
-            await _resolveOptionalImagePath(backgroundCategory.bgCateIcon);
-        List<Background> tempBackground = [];
-        for (Background background in (backgroundCategory.background ?? [])) {
-          var backgroundFilePath =
-              await _resolveOptionalImagePath(background.bgUrl);
-          if (backgroundFilePath == null) continue;
-          if ((background.maskJson ?? []).isNotEmpty) {
-            backgroundFilePath =
-                await backgroundMaskUtils.resolveMaskedBackgroundPath(
-                    backgroundFilePath, background.getMaskAreas());
-          }
-          background = background.copyWith(bgUrl: backgroundFilePath);
-          tempBackground.add(background);
-        }
-        backgroundCategory = backgroundCategory.copyWith(
-          bgCateIcon: backgroundCateFilePath,
-          background: tempBackground,
-        );
-        tempBackgroundInfo.add(backgroundCategory);
-      }
-      if (!tempBackgroundInfo.any((cat) => (cat.background ?? []).isNotEmpty)) {
-        tempBackgroundInfo.add(await _fallbackBackgroundInfo(frameInfo));
-      }
-      // Include frame if it has at least one usable background, even without a frame overlay image
-      final hasUsableBackgrounds =
-          tempBackgroundInfo.any((cat) => (cat.background ?? []).isNotEmpty);
-      if (hasUsableBackgrounds || frameInfo.frameUrl != null) {
-        tempData.add(frameInfo.copyWith(backgroundInfo: tempBackgroundInfo));
-      }
-    }
+  Future<AppData> _prepareAppData(AppData remoteData) async {
+    final frameInfos = remoteData.framesInfo ?? [];
+    final backgroundCount = frameInfos.fold<int>(
+      0,
+      (count, frame) =>
+          count +
+          (frame.backgroundInfo ?? []).fold<int>(
+            0,
+            (categoryCount, category) =>
+                categoryCount + (category.background ?? []).length,
+          ),
+    );
+    logD(
+      'Preparing app data assets: frames=${frameInfos.length} '
+      'backgrounds=$backgroundCount batch=$_assetResolveBatchSize',
+    );
+
+    final preparedFrames = await _mapInBatches<FramesInfo, FramesInfo?>(
+      frameInfos,
+      _assetResolveBatchSize,
+      _prepareFrameInfo,
+    );
+    final tempData = preparedFrames.whereType<FramesInfo>().toList();
     if (tempData.isEmpty && (remoteData.framesInfo ?? []).isNotEmpty) {
       throw StateError('No usable frame assets were resolved from admin data');
     }
+    logD('Prepared app data assets: usableFrames=${tempData.length}');
     return remoteData.copyWith(framesInfo: tempData);
+  }
+
+  Future<FramesInfo?> _prepareFrameInfo(FramesInfo frameInfo) async {
+    final framePaths = await Future.wait<String?>([
+      _resolveOptionalImagePath(frameInfo.frameUrlTempDis),
+      _resolveOptionalImagePath(frameInfo.frameUrl),
+    ]);
+    final tempFramePath = framePaths[0];
+    final mainFramePath = framePaths[1];
+
+    final preparedFrame = frameInfo.copyWith(
+      frameUrlTempDis: tempFramePath,
+      frameUrl: mainFramePath ?? tempFramePath,
+    );
+    final tempBackgroundInfo =
+        await _mapInBatches<BackgroundInfo, BackgroundInfo>(
+      frameInfo.backgroundInfo ?? [],
+      _assetResolveBatchSize,
+      _prepareBackgroundCategory,
+    );
+
+    if (!tempBackgroundInfo.any((cat) => (cat.background ?? []).isNotEmpty)) {
+      tempBackgroundInfo.add(await _fallbackBackgroundInfo(preparedFrame));
+    }
+    // Include frame if it has at least one usable background, even without a frame overlay image.
+    final hasUsableBackgrounds =
+        tempBackgroundInfo.any((cat) => (cat.background ?? []).isNotEmpty);
+    if (hasUsableBackgrounds || preparedFrame.frameUrl != null) {
+      return preparedFrame.copyWith(backgroundInfo: tempBackgroundInfo);
+    }
+    return null;
+  }
+
+  Future<BackgroundInfo> _prepareBackgroundCategory(
+    BackgroundInfo backgroundCategory,
+  ) async {
+    final iconFuture = _resolveOptionalImagePath(backgroundCategory.bgCateIcon);
+    final preparedBackgrounds = await _mapInBatches<Background, Background?>(
+      backgroundCategory.background ?? [],
+      _assetResolveBatchSize,
+      _prepareBackground,
+    );
+    final backgroundCateFilePath = await iconFuture;
+    return backgroundCategory.copyWith(
+      bgCateIcon: backgroundCateFilePath,
+      background: preparedBackgrounds.whereType<Background>().toList(),
+    );
+  }
+
+  Future<Background?> _prepareBackground(Background background) async {
+    var backgroundFilePath = await _resolveOptionalImagePath(background.bgUrl);
+    if (backgroundFilePath == null) {
+      return null;
+    }
+    if ((background.maskJson ?? []).isNotEmpty) {
+      backgroundFilePath =
+          await backgroundMaskUtils.resolveMaskedBackgroundPath(
+        backgroundFilePath,
+        background.getMaskAreas(),
+      );
+    }
+    return background.copyWith(bgUrl: backgroundFilePath);
+  }
+
+  Future<List<R>> _mapInBatches<T, R>(
+    List<T> items,
+    int batchSize,
+    Future<R> Function(T item) mapper,
+  ) async {
+    final results = <R>[];
+    for (var index = 0; index < items.length; index += batchSize) {
+      final end =
+          index + batchSize > items.length ? items.length : index + batchSize;
+      results.addAll(await Future.wait(items.sublist(index, end).map(mapper)));
+    }
+    return results;
   }
 
   Future<String?> _resolveOptionalImagePath(String? source) async {
@@ -467,8 +535,13 @@ class AppState extends ChangeNotifier with LogMixin {
     final previousSelectedFrameCode = imageParam.selectedFrame.frameCd;
     final previousSelectedBackgroundCode = imageParam.selectedBackground.bgCd;
     try {
-      final remoteData = await restClient.initData();
+      final remoteData = await _fetchRemoteAppData(_adminDataReloadTimeout);
+      final prepareStopwatch = Stopwatch()..start();
       final preparedData = await _prepareAppData(remoteData);
+      logD(
+        'Reload app data prepared in '
+        '${prepareStopwatch.elapsedMilliseconds}ms',
+      );
       await _saveAdminDataLocal(preparedData);
       await _applyPreparedAppData(preparedData);
       latestAdminDataVersion = activeAdminDataVersion;
@@ -500,7 +573,14 @@ class AppState extends ChangeNotifier with LogMixin {
     isCheckingAdminUpdate = true;
     notifyListeners();
     try {
-      final result = await restClient.fetchMainInfoVersion();
+      final stopwatch = Stopwatch()..start();
+      final result = await restClient
+          .fetchMainInfoVersion()
+          .timeout(_adminVersionCheckTimeout);
+      logD(
+        '/pub/main-info/version completed in '
+        '${stopwatch.elapsedMilliseconds}ms',
+      );
       final version = result.version?.toString().trim() ?? '';
       if (version.isNotEmpty) {
         latestAdminDataVersion = version;
@@ -587,7 +667,10 @@ class AppState extends ChangeNotifier with LogMixin {
       return response;
     } catch (error, stackTrace) {
       logE(error, stackTrace: stackTrace);
-      job['status'] = 'failed_retryable';
+      job['status'] = _isPermanentUploadError(error)
+          ? 'failed_permanent'
+          : 'failed_retryable';
+      job['error'] = _uploadErrorMessage(error);
       job['updatedAt'] = DateTime.now().toUtc().toIso8601String();
       await _upsertUploadJob(job);
       return null;
@@ -595,32 +678,116 @@ class AppState extends ChangeNotifier with LogMixin {
   }
 
   Future<void> retryPendingUploads() async {
-    final jobs = await _readUploadJobs();
-    var changed = false;
-    for (final job in jobs) {
-      final status = (job['status'] ?? '').toString();
-      if (status != 'pending_upload' && status != 'failed_retryable') {
+    if (_isRetryingPendingUploads) {
+      logD('Upload queue retry skipped: already running');
+      return;
+    }
+
+    _isRetryingPendingUploads = true;
+    try {
+      final jobs = await _readUploadJobs();
+      var changed = false;
+      for (final job in jobs) {
+        final status = (job['status'] ?? '').toString();
+        if (status != 'pending_upload' && status != 'failed_retryable') {
+          continue;
+        }
+
+        final invalidReason = _validateUploadJobForRetry(job);
+        if (invalidReason != null) {
+          job['status'] = 'failed_permanent';
+          job['error'] = invalidReason;
+          job['updatedAt'] = DateTime.now().toUtc().toIso8601String();
+          changed = true;
+          await _writeUploadJobs(jobs);
+          logE(
+            'Upload queue job marked permanent failed: '
+            'saleNo=${job['saleNo']} reason=$invalidReason',
+          );
+          continue;
+        }
+
+        job['status'] = 'uploading';
+        job['updatedAt'] = DateTime.now().toUtc().toIso8601String();
+        changed = true;
+        await _writeUploadJobs(jobs);
+        try {
+          final response = await _submitUploadJob(job).timeout(
+            const Duration(seconds: 25),
+          );
+          job['status'] = 'uploaded';
+          job['qrUrl'] = response.qrUrl;
+          job.remove('error');
+          await _cleanupUploadedQueueFiles(job);
+        } catch (error, stackTrace) {
+          logE(error, stackTrace: stackTrace);
+          job['status'] = _isPermanentUploadError(error)
+              ? 'failed_permanent'
+              : 'failed_retryable';
+          job['error'] = _uploadErrorMessage(error);
+          job['retryCount'] = ((job['retryCount'] as num?)?.toInt() ?? 0) + 1;
+        }
+        job['updatedAt'] = DateTime.now().toUtc().toIso8601String();
+        await _writeUploadJobs(jobs);
+      }
+      if (changed) {
+        logD('Upload queue retry completed');
+      }
+    } finally {
+      _isRetryingPendingUploads = false;
+    }
+  }
+
+  String? _validateUploadJobForRetry(Map<String, Object?> job) {
+    final saleNo = (job['saleNo'] ?? '').toString().trim();
+    if (saleNo.isEmpty) {
+      return 'saleNo is blank';
+    }
+
+    final frameId = (job['frameId'] ?? '').toString().trim();
+    if (frameId.isEmpty) {
+      return 'frameId is blank';
+    }
+
+    final imagePath = (job['imagePath'] ?? '').toString().trim();
+    if (imagePath.isEmpty) {
+      return 'imagePath is blank';
+    }
+    if (!File(imagePath).existsSync()) {
+      return 'imagePath does not exist';
+    }
+
+    for (final videoPath in _readJobVideoPaths(job)) {
+      if (videoPath.trim().isEmpty) {
         continue;
       }
-      job['status'] = 'uploading';
-      job['updatedAt'] = DateTime.now().toUtc().toIso8601String();
-      changed = true;
-      await _writeUploadJobs(jobs);
-      try {
-        final response = await _submitUploadJob(job);
-        job['status'] = 'uploaded';
-        job['qrUrl'] = response.qrUrl;
-        await _cleanupUploadedQueueFiles(job);
-      } catch (error, stackTrace) {
-        logE(error, stackTrace: stackTrace);
-        job['status'] = 'failed_retryable';
+      if (!File(videoPath).existsSync()) {
+        return 'videoPath does not exist';
       }
-      job['updatedAt'] = DateTime.now().toUtc().toIso8601String();
-      await _writeUploadJobs(jobs);
     }
-    if (changed) {
-      logD('Upload queue retry completed');
+
+    return null;
+  }
+
+  bool _isPermanentUploadError(Object error) {
+    if (error is DioException) {
+      final statusCode = error.response?.statusCode ?? 0;
+      return statusCode >= 400 &&
+          statusCode < 500 &&
+          statusCode != 408 &&
+          statusCode != 429;
     }
+    return false;
+  }
+
+  String _uploadErrorMessage(Object error) {
+    if (error is DioException) {
+      final statusCode = error.response?.statusCode;
+      final responseData = error.response?.data;
+      final message = responseData ?? error.message;
+      return 'HTTP $statusCode: $message';
+    }
+    return error.toString();
   }
 
   void _syncSelectedFrameFromRemote(String? frameCd) {

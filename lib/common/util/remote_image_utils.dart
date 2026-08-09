@@ -10,12 +10,14 @@ import 'package:project_l/common/util/directory_utils.dart';
 @Injectable()
 class RemoteImageUtils with LogMixin {
   final Dio _dio = Dio(BaseOptions(
-    connectTimeout: const Duration(seconds: 30),
-    sendTimeout: const Duration(seconds: 30),
-    receiveTimeout: const Duration(seconds: 60),
+    connectTimeout: const Duration(seconds: 10),
+    sendTimeout: const Duration(seconds: 10),
+    receiveTimeout: const Duration(seconds: 20),
   ));
+  static const int _maxDownloadAttempts = 2;
   late String savePath;
   late final Future<void> _initFuture;
+  final Map<String, Future<String>> _inFlightDownloads = {};
 
   RemoteImageUtils() {
     _initFuture = _init();
@@ -44,7 +46,7 @@ class RemoteImageUtils with LogMixin {
     Function(int, int)? onReceiveProgress,
     int counter = 0,
   ]) async {
-    if (counter >= 3) {
+    if (counter >= _maxDownloadAttempts) {
       return "";
     }
     await _initFuture;
@@ -53,6 +55,37 @@ class RemoteImageUtils with LogMixin {
     if (file.existsSync() && await file.length() > 0) {
       return filePath;
     }
+    final inFlightDownload = _inFlightDownloads[filePath];
+    if (inFlightDownload != null) {
+      return inFlightDownload;
+    }
+
+    final downloadFuture = _downloadMissingFile(
+      url,
+      fileName,
+      filePath,
+      file,
+      onReceiveProgress,
+      counter,
+    );
+    _inFlightDownloads[filePath] = downloadFuture;
+    try {
+      return await downloadFuture;
+    } finally {
+      if (_inFlightDownloads[filePath] == downloadFuture) {
+        _inFlightDownloads.remove(filePath);
+      }
+    }
+  }
+
+  Future<String> _downloadMissingFile(
+    String url,
+    String fileName,
+    String filePath,
+    File file,
+    Function(int, int)? onReceiveProgress,
+    int counter,
+  ) async {
     try {
       if (file.existsSync()) {
         await file.delete();

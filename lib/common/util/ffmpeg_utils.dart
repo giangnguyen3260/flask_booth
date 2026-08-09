@@ -128,6 +128,59 @@ class FfmpegUtils {
     return renderedImageOutput;
   }
 
+  Future<String> cropImageToAspectRatio({
+    required String imagePath,
+    required double targetAspectRatio,
+  }) async {
+    if (imagePath.isEmpty || targetAspectRatio <= 0) {
+      return imagePath;
+    }
+    final sourceSize = await _readImageSize(imagePath);
+    final sourceRatio = sourceSize.$1 / sourceSize.$2;
+    if ((sourceRatio - targetAspectRatio).abs() < 0.01) {
+      return imagePath;
+    }
+
+    var cropWidth = sourceSize.$1;
+    var cropHeight = sourceSize.$2;
+    if (sourceRatio > targetAspectRatio) {
+      cropWidth = math.max(1, (sourceSize.$2 * targetAspectRatio).round());
+    } else {
+      cropHeight = math.max(1, (sourceSize.$1 / targetAspectRatio).round());
+    }
+    cropWidth = cropWidth.clamp(1, sourceSize.$1).toInt();
+    cropHeight = cropHeight.clamp(1, sourceSize.$2).toInt();
+    final cropX = ((sourceSize.$1 - cropWidth) / 2).round();
+    final cropY = ((sourceSize.$2 - cropHeight) / 2).round();
+    final outputPath = path.join(
+      _savedImagePath,
+      'Capture_${DateTimeUtils.format(date: DateTime.now(), format: "dd_MM_yyyy_HH_mm_ss_SSS")}.png',
+    );
+
+    final outputFile = await FFMpegHelper.instance.runSync(
+      FFMpegCommand(outputFilepath: outputPath, inputs: [
+        FFMpegInput([
+          '-i',
+          imagePath,
+          '-vf',
+          'crop=$cropWidth:$cropHeight:$cropX:$cropY',
+          '-frames:v',
+          '1',
+          '-c:v',
+          'png',
+          '-compression_level',
+          '1',
+          '-y',
+        ]),
+      ]),
+      timeout: _imageSlotTimeout,
+    );
+    if (outputFile == null || !outputFile.existsSync()) {
+      throw StateError('FFmpeg capture crop failed: $imagePath');
+    }
+    return outputPath;
+  }
+
   String _buildImagePreprocessFilters({
     required double brightness,
     required double contrast,
