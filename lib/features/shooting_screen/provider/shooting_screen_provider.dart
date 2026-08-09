@@ -31,10 +31,19 @@ class ShootingScreenProvider extends BaseProvider<ShootingScreenListenState> {
     return value <= 0 ? 10 : value;
   }
 
-  void saveImage({required String imagePath}) {
+  Future<void> saveImage({
+    required String imagePath,
+    double? targetAspectRatio,
+  }) async {
+    final resolvedImagePath = await _cropCaptureIfNeeded(
+      imagePath: imagePath,
+      targetAspectRatio: targetAspectRatio,
+    );
     logD(
-        'Shooting saveImage: path=$imagePath exists=${File(imagePath).existsSync()}');
-    uiImages.add(imagePath);
+      'Shooting saveImage: path=$resolvedImagePath '
+      'exists=${File(resolvedImagePath).existsSync()}',
+    );
+    uiImages.add(resolvedImagePath);
     unawaited(
       appState.sendEvent(
         eventType: "PHOTO_CAPTURED",
@@ -68,6 +77,7 @@ class ShootingScreenProvider extends BaseProvider<ShootingScreenListenState> {
   Future<void> saveMockCapture({
     required String imagePath,
     String? videoPath,
+    double? targetAspectRatio,
   }) async {
     final sourceFile = File(imagePath);
     if (!sourceFile.existsSync()) {
@@ -87,6 +97,10 @@ class ShootingScreenProvider extends BaseProvider<ShootingScreenListenState> {
       'mock_capture_${appState.imageParam.session}_$captureIndex.jpg',
     );
     await sourceFile.copy(uniquePath);
+    final resolvedImagePath = await _cropCaptureIfNeeded(
+      imagePath: uniquePath,
+      targetAspectRatio: targetAspectRatio,
+    );
     var resolvedVideoPath = uniquePath;
     if (videoPath != null && videoPath.isNotEmpty) {
       final sourceVideoFile = File(videoPath);
@@ -102,8 +116,8 @@ class ShootingScreenProvider extends BaseProvider<ShootingScreenListenState> {
       }
     }
 
-    uiImages.add(uniquePath);
-    tImages.add(uniquePath);
+    uiImages.add(resolvedImagePath);
+    tImages.add(resolvedImagePath);
     tVideos.add(resolvedVideoPath);
     unawaited(
       appState.sendEvent(
@@ -116,6 +130,32 @@ class ShootingScreenProvider extends BaseProvider<ShootingScreenListenState> {
       ),
     );
     notifyListeners();
+  }
+
+  Future<String> _cropCaptureIfNeeded({
+    required String imagePath,
+    double? targetAspectRatio,
+  }) async {
+    final aspectRatio = targetAspectRatio;
+    if (aspectRatio == null || aspectRatio <= 0) {
+      return imagePath;
+    }
+    try {
+      final croppedPath = await _ffmpegUtils.cropImageToAspectRatio(
+        imagePath: imagePath,
+        targetAspectRatio: aspectRatio,
+      );
+      if (croppedPath != imagePath) {
+        logD(
+          'Shooting crop capture: source=$imagePath '
+          'targetAspectRatio=$aspectRatio output=$croppedPath',
+        );
+      }
+      return croppedPath;
+    } catch (error, stackTrace) {
+      logE(error, stackTrace: stackTrace);
+      return imagePath;
+    }
   }
 
   void onNextEvent() async {

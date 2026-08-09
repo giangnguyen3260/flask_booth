@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'dart:ui';
 
 import 'package:injectable/injectable.dart';
+import 'package:project_l/common/constants/printer_constants.dart';
 import 'package:project_l/common/enums/orientation_enum.dart';
 import 'package:project_l/common/enums/printer_cut_mode.dart';
 import 'package:project_l/common/extensions/size_extension.dart';
@@ -165,23 +166,6 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
       final effectiveParams = params.sublist(0, effectiveCount);
 
       if (isCut) {
-        preparationStatus = 'Preparing printer cut mode...';
-        notifyListeners();
-        logD('Printing change cut mode: twoInch');
-        final cutModeChanged =
-            await _printerUtils.changeCutMode(PrinterCutMode.twoInch);
-        if (!cutModeChanged) {
-          logE('Printing change cut mode failed: twoInch');
-          preparationStatus = 'Printer cut mode failed';
-          appState.updatePrinterConnectionStatus(
-            connected: false,
-            errorCode: 'CUT_MODE_FAILED',
-          );
-          appState.sendPrinterStatusReport();
-          notifyListeners();
-          return false;
-        }
-
         preparationStatus = 'Merging print image...';
         notifyListeners();
         logD('Printing merge upload image start');
@@ -193,28 +177,10 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
             params: effectiveParams,
             flip: appState.imageParam.isFlipped);
         logD('Printing merge upload image done: $uploadImage');
-        printingImage =
-            await _ffmpegUtils.mergeHorizontalImage(imagePath: uploadImage);
-        logD('Printing cut print image (hstack): $printingImage');
+        printingImage = uploadImage;
+        logD('Printing cut print image: $printingImage');
         finalPreviewImagePath = uploadImage;
       } else {
-        preparationStatus = 'Preparing printer cut mode...';
-        notifyListeners();
-        logD('Printing change cut mode: standard');
-        final cutModeChanged =
-            await _printerUtils.changeCutMode(PrinterCutMode.standard);
-        if (!cutModeChanged) {
-          logE('Printing change cut mode failed: standard');
-          preparationStatus = 'Printer cut mode failed';
-          appState.updatePrinterConnectionStatus(
-            connected: false,
-            errorCode: 'CUT_MODE_FAILED',
-          );
-          appState.sendPrinterStatusReport();
-          notifyListeners();
-          return false;
-        }
-
         preparationStatus = 'Merging print image...';
         notifyListeners();
         logD('Printing merge print image start');
@@ -294,24 +260,49 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
       try {
         preparationStatus = 'Sending print job...';
         notifyListeners();
-        final orientation = await _resolvePrintImageOrientation(printJobImage);
-        final printCopies = _resolvePrintCopies(isCut: isCut);
-        logD(
-            'Printing print job start: $printJobImage orientation=$orientation');
-        final printQueued = await _printerUtils
-            .printImage(
-              file: File(printJobImage),
-              numCut: printCopies,
-              orientation: orientation,
-            )
-            .timeout(
-              const Duration(seconds: 45),
-              onTimeout: () => false,
-            );
-        logD(
-          'Printing print job done: queued=$printQueued copies=$printCopies',
+        final cutModeReady = await _preparePrinterCutMode(
+          isCut: isCut,
+          allowFailure: isCut,
         );
-        appState.updatePrinterConnectionStatus(connected: true);
+        if (!cutModeReady) {
+          return false;
+        }
+
+        final printJobImages = _resolvePrintJobImages(
+          imagePath: printJobImage,
+        );
+        final printCopies = _resolvePrintCopies();
+        var allPrintsQueued = true;
+        logD(
+          'Printing print jobs start: count=${printJobImages.length} '
+          'copies=$printCopies isCut=$isCut',
+        );
+        for (var index = 0; index < printJobImages.length; index++) {
+          final imagePath = printJobImages[index];
+          final orientation = await _resolvePrintImageOrientation(imagePath);
+          logD(
+            'Printing print job start: ${index + 1}/${printJobImages.length} '
+            '$imagePath orientation=$orientation usePrinterSettings=$isCut',
+          );
+          final printQueued = await _printerUtils
+              .printImage(
+                file: File(imagePath),
+                format: PrinterConstants.p6x4Format,
+                numCut: printCopies,
+                orientation: orientation,
+                usePrinterSettings: isCut,
+              )
+              .timeout(
+                const Duration(seconds: 45),
+                onTimeout: () => false,
+              );
+          allPrintsQueued = allPrintsQueued && printQueued;
+        }
+        logD(
+          'Printing print jobs done: queued=$allPrintsQueued '
+          'jobs=${printJobImages.length} copies=$printCopies',
+        );
+        appState.updatePrinterConnectionStatus(connected: allPrintsQueued);
         appState.sendPrinterStatusReport();
       } catch (error, stackTrace) {
         logE(error, stackTrace: stackTrace);
@@ -492,10 +483,44 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
     return appState.imageParam.selectedBackground.isHorizontalForPrint();
   }
 
-  int _resolvePrintCopies({required bool isCut}) {
+  int _resolvePrintCopies() {
     final quantity = appState.imageParam.printQuantity;
-    final copies = isCut ? (quantity / 2).ceil() : quantity;
-    return copies < 1 ? 1 : copies;
+    return quantity < 1 ? 1 : quantity;
+  }
+
+  List<String> _resolvePrintJobImages({
+    required String imagePath,
+  }) {
+    return [imagePath];
+  }
+
+  Future<bool> _preparePrinterCutMode({
+    required bool isCut,
+    bool allowFailure = false,
+  }) async {
+    preparationStatus = 'Preparing printer cut mode...';
+    notifyListeners();
+    final cutMode = isCut ? PrinterCutMode.twoInch : PrinterCutMode.standard;
+    logD('Printing change cut mode before print: $cutMode');
+    final cutModeChanged = await _printerUtils.changeCutMode(cutMode);
+    if (cutModeChanged) {
+      return true;
+    }
+
+    logE('Printing change cut mode failed before print: $cutMode');
+    if (allowFailure) {
+      logD('Printing continue with software split despite cut mode failure');
+      return true;
+    }
+
+    preparationStatus = 'Printer cut mode failed';
+    appState.updatePrinterConnectionStatus(
+      connected: false,
+      errorCode: 'CUT_MODE_FAILED',
+    );
+    appState.sendPrinterStatusReport();
+    notifyListeners();
+    return false;
   }
 
   double _resolvePaidAmount() {
@@ -510,22 +535,28 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
     String imagePath,
   ) async {
     try {
-      final bytes = await File(imagePath).readAsBytes();
-      final codec = await instantiateImageCodec(bytes);
-      final frame = await codec.getNextFrame();
-      final image = frame.image;
+      final size = await _readImagePixelSize(imagePath);
       final orientation =
-          Size(image.width.toDouble(), image.height.toDouble()).orientation;
+          Size(size.$1.toDouble(), size.$2.toDouble()).orientation;
       logD(
         'Printing resolved image orientation: '
-        '${image.width}x${image.height} $orientation',
+        '${size.$1}x${size.$2} $orientation',
       );
-      image.dispose();
-      codec.dispose();
       return orientation;
     } catch (error, stackTrace) {
       logE(error, stackTrace: stackTrace);
       return OrientationEnum.landscape;
     }
+  }
+
+  Future<(int, int)> _readImagePixelSize(String imagePath) async {
+    final bytes = await File(imagePath).readAsBytes();
+    final codec = await instantiateImageCodec(bytes);
+    final frame = await codec.getNextFrame();
+    final image = frame.image;
+    final size = (image.width, image.height);
+    image.dispose();
+    codec.dispose();
+    return size;
   }
 }

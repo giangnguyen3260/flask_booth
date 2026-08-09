@@ -19,6 +19,7 @@ import 'package:path/path.dart' as path;
 class PrinterUtils {
   late final String _twoInchCutPath = Assets.files.a2inchCut;
   late final String _normalCutPath = Assets.files.normalCut;
+  static const List<int> _twoInchCutByteOffsets = [0x1A4, 0x570];
   final MethodChannel _printerMethodChannel =
       MethodChannel(PrinterMethodChannelConstants.methodChannelName);
 
@@ -29,8 +30,13 @@ class PrinterUtils {
     PdfPageFormat format = PrinterConstants.p6x4Format,
     int numCut = 0,
     required OrientationEnum orientation,
+    bool usePrinterSettings = false,
   }) async {
-    print('PrinterUtils.printImage file=${file.path} copies=$numCut');
+    print(
+      'PrinterUtils.printImage file=${file.path} copies=$numCut '
+      'format=${format.width}x${format.height} '
+      'usePrinterSettings=$usePrinterSettings',
+    );
     if (!file.existsSync()) {
       print('PrinterUtils.printImage missing file=${file.path}');
       return false;
@@ -42,17 +48,21 @@ class PrinterUtils {
 
     doc.addPage(
       pw.Page(
+        margin: pw.EdgeInsets.zero,
         orientation: orientation == OrientationEnum.portrait
             ? pw.PageOrientation.portrait
             : pw.PageOrientation.landscape,
         pageFormat: format,
         build: (pw.Context context) {
-          return pw.Center(
-            child: pw.Image(
-              pw.MemoryImage(
-                bytes,
+          return pw.Container(
+            color: PdfColors.white,
+            child: pw.Center(
+              child: pw.Image(
+                pw.MemoryImage(
+                  bytes,
+                ),
+                fit: pw.BoxFit.contain,
               ),
-              fit: pw.BoxFit.contain,
             ),
           );
         },
@@ -78,7 +88,7 @@ class PrinterUtils {
       print('PrinterUtils.directPrintPdf copy=${i + 1}/$copies');
       await Future.value(Printing.directPrintPdf(
         format: format,
-        usePrinterSettings: false,
+        usePrinterSettings: usePrinterSettings,
         onLayout: (PdfPageFormat format) async => pdfBytes,
         printer: printer,
       )).timeout(
@@ -112,9 +122,7 @@ class PrinterUtils {
   * This function is used to change printer setting
   * */
   Future<bool> changeCutMode(PrinterCutMode cutMode) async {
-    final presetPath = _resolveAssetFile(
-      cutMode == PrinterCutMode.standard ? _normalCutPath : _twoInchCutPath,
-    );
+    final presetPath = await _resolveCutPresetPath(cutMode);
     if (!File(presetPath).existsSync()) {
       print('PrinterUtils.changeCutMode missing preset: $presetPath');
       return false;
@@ -130,15 +138,45 @@ class PrinterUtils {
         cmd += '"$presetPath"';
         break;
     }
-    final command = '$cmd u';
+    final command = '$cmd g';
     print('PrinterUtils.changeCutMode mode=$cutMode command=$command');
     final result =
         await _printerMethodChannel.invokeMethod<bool>("change_mode", {
               "command": command,
+              "printer_name": PrinterConstants.printerName,
+              "preset_path": presetPath,
             }).timeout(const Duration(seconds: 30)) ??
             false;
     print('PrinterUtils.changeCutMode result=$result mode=$cutMode');
     return result;
+  }
+
+  Future<String> _resolveCutPresetPath(PrinterCutMode cutMode) async {
+    if (cutMode == PrinterCutMode.standard) {
+      return _resolveAssetFile(_normalCutPath);
+    }
+
+    final normalPresetPath = _resolveAssetFile(_normalCutPath);
+    final normalPreset = File(normalPresetPath);
+    if (!normalPreset.existsSync()) {
+      return _resolveAssetFile(_twoInchCutPath);
+    }
+
+    final bytes = await normalPreset.readAsBytes();
+    for (final offset in _twoInchCutByteOffsets) {
+      if (offset >= bytes.length) {
+        return _resolveAssetFile(_twoInchCutPath);
+      }
+      bytes[offset] = 1;
+    }
+
+    final tempPresetPath = path.join(
+      Directory.systemTemp.path,
+      'project_l_ds_rx1_2inch_normal_quality.dat',
+    );
+    await File(tempPresetPath).writeAsBytes(bytes, flush: true);
+    print('PrinterUtils.changeCutMode generated preset=$tempPresetPath');
+    return path.normalize(tempPresetPath);
   }
 
   String _resolveAssetFile(String assetPath) {

@@ -139,7 +139,16 @@ class _ShootingScreenState extends BasePageState<ShootingScreenListenState,
               _lastCapturedImagePath = imagePath;
             });
           }
-          provider.saveImage(imagePath: imagePath);
+          await provider.saveImage(
+            imagePath: imagePath,
+            targetAspectRatio: captureAspectRatio.aspectRatio,
+          );
+          if (mounted) {
+            setState(() {
+              _lastCapturedImagePath =
+                  provider.latestPreviewImagePath ?? imagePath;
+            });
+          }
           if (provider.uiImages.length < shotCount) {
             _commonCounterController.reset();
             await _startLiveViewRecordingForNextShot();
@@ -448,7 +457,10 @@ class _ShootingScreenState extends BasePageState<ShootingScreenListenState,
     if (_commonCounterController.currentCounter == 0) {
       if (isMockCameraMode) {
         final imagePath = await _ensureMockCapturePath();
-        await provider.saveMockCapture(imagePath: imagePath);
+        await provider.saveMockCapture(
+          imagePath: imagePath,
+          targetAspectRatio: captureAspectRatio.aspectRatio,
+        );
         if (mounted) {
           setState(() {
             _lastCapturedImagePath =
@@ -473,6 +485,7 @@ class _ShootingScreenState extends BasePageState<ShootingScreenListenState,
           await provider.saveMockCapture(
             imagePath: imagePath,
             videoPath: videoFile?.path,
+            targetAspectRatio: captureAspectRatio.aspectRatio,
           );
           if (mounted) {
             setState(() {
@@ -582,12 +595,16 @@ class _ShootingScreenState extends BasePageState<ShootingScreenListenState,
                                     ? _CanonCapturePreview(
                                         imagePath: null,
                                         textureId: _canonTextureId,
+                                        sourceAspectRatio: EAspectRatio
+                                            .sixteenNine.aspectRatio,
                                       )
                                     : controller != null
                                         ? CameraPreview(controller!)
                                         : _CanonCapturePreview(
                                             imagePath: null,
                                             textureId: _canonTextureId,
+                                            sourceAspectRatio: EAspectRatio
+                                                .sixteenNine.aspectRatio,
                                           ),
                           ),
                           if (!isMockCameraMode && controller != null)
@@ -654,12 +671,16 @@ class _ShootingScreenState extends BasePageState<ShootingScreenListenState,
                                       ? _CanonCapturePreview(
                                           imagePath: null,
                                           textureId: _canonTextureId,
+                                          sourceAspectRatio: EAspectRatio
+                                              .sixteenNine.aspectRatio,
                                         )
                                       : controller != null
                                           ? CameraPreview(controller!)
                                           : _CanonCapturePreview(
                                               imagePath: null,
                                               textureId: _canonTextureId,
+                                              sourceAspectRatio: EAspectRatio
+                                                  .sixteenNine.aspectRatio,
                                             ),
                             ),
                             if (!isMockCameraMode && controller != null)
@@ -1054,28 +1075,39 @@ class _CanonCapturePreview extends StatelessWidget {
   const _CanonCapturePreview({
     required this.imagePath,
     required this.textureId,
+    this.sourceAspectRatio = 16 / 9,
   });
 
   final String? imagePath;
   final int? textureId;
+  final double sourceAspectRatio;
 
   @override
   Widget build(BuildContext context) {
     final valueTextureId = textureId;
     if (valueTextureId != null && valueTextureId >= 0) {
-      return Stack(
-        fit: StackFit.expand,
-        children: [
-          const ColoredBox(color: Colors.black),
-          Transform(
-            alignment: Alignment.center,
-            transform: Matrix4.diagonal3Values(-1.0, 1.0, 1.0),
-            child: Texture(
-              textureId: valueTextureId,
-              filterQuality: FilterQuality.medium,
+      return ClipRect(
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            const ColoredBox(color: Colors.black),
+            FittedBox(
+              fit: BoxFit.cover,
+              child: SizedBox(
+                width: sourceAspectRatio * 1000,
+                height: 1000,
+                child: Transform(
+                  alignment: Alignment.center,
+                  transform: Matrix4.diagonal3Values(-1.0, 1.0, 1.0),
+                  child: Texture(
+                    textureId: valueTextureId,
+                    filterQuality: FilterQuality.medium,
+                  ),
+                ),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       );
     }
 

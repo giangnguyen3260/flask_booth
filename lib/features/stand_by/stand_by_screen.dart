@@ -76,8 +76,8 @@ class _StandByScreenState
       return;
     }
     await appState.checkForAdminDataUpdate(force: forceAdminCheck);
-    await appState.retryPendingUploads();
     await appState.sendPrinterStatusReport();
+    unawaited(appState.retryPendingUploads());
   }
 
   @override

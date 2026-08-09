@@ -1,5 +1,6 @@
 #include "flutter_window.h"
 
+#include <cstddef>
 #include <optional>
 
 #include "flutter/generated_plugin_registrant.h"
@@ -34,7 +35,6 @@ bool RunPrintUiCommand(const std::string &commandUtf8) {
     const std::wstring parameters = Utf8ToWide(commandUtf8);
     SHELLEXECUTEINFOW sei = { sizeof(SHELLEXECUTEINFOW) };
     sei.fMask = SEE_MASK_NOCLOSEPROCESS;
-    sei.lpVerb = L"runas";
     sei.lpFile = L"rundll32.exe";
     sei.lpParameters = parameters.c_str();
     sei.nShow = SW_HIDE;
@@ -50,9 +50,10 @@ bool RunPrintUiCommand(const std::string &commandUtf8) {
         return false;
     }
 
-    DWORD waitResult = WaitForSingleObject(sei.hProcess, 60000);
+    DWORD waitResult = WaitForSingleObject(sei.hProcess, 25000);
     if (waitResult != WAIT_OBJECT_0) {
         std::wcerr << L"PrintUI command did not finish. Wait result: " << waitResult << std::endl;
+        TerminateProcess(sei.hProcess, 1);
         CloseHandle(sei.hProcess);
         return false;
     }
@@ -70,6 +71,141 @@ bool RunPrintUiCommand(const std::string &commandUtf8) {
         return false;
     }
     return true;
+}
+
+std::wstring DevModeDeviceName(const DEVMODEW *devMode) {
+    size_t length = 0;
+    while (length < CCHDEVICENAME && devMode->dmDeviceName[length] != L'\0') {
+        length++;
+    }
+    return std::wstring(devMode->dmDeviceName, length);
+}
+
+std::vector<BYTE> ReadBinaryFile(const std::wstring &filePath) {
+    HANDLE file = CreateFileW(filePath.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL,
+                              OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (file == INVALID_HANDLE_VALUE) {
+        std::wcerr << L"Could not open preset file. Error code: " << GetLastError() << std::endl;
+        return {};
+    }
+
+    LARGE_INTEGER fileSize;
+    if (!GetFileSizeEx(file, &fileSize) || fileSize.QuadPart <= 0 ||
+        fileSize.QuadPart > 1024 * 1024) {
+        std::wcerr << L"Invalid preset file size." << std::endl;
+        CloseHandle(file);
+        return {};
+    }
+
+    std::vector<BYTE> bytes(static_cast<size_t>(fileSize.QuadPart));
+    DWORD bytesRead = 0;
+    const BOOL readOk = ReadFile(file, bytes.data(), static_cast<DWORD>(bytes.size()),
+                                 &bytesRead, NULL);
+    CloseHandle(file);
+    if (!readOk || bytesRead != bytes.size()) {
+        std::wcerr << L"Could not read preset file. Error code: " << GetLastError() << std::endl;
+        return {};
+    }
+    return bytes;
+}
+
+DEVMODEW *FindDevModeInPreset(std::vector<BYTE> &presetBytes,
+                              const std::wstring &printerName) {
+    for (size_t offset = 0; offset + sizeof(DEVMODEW) <= presetBytes.size(); offset += 2) {
+        auto *devMode = reinterpret_cast<DEVMODEW *>(presetBytes.data() + offset);
+        const DWORD devModeSize = devMode->dmSize;
+        const DWORD totalSize = devModeSize + devMode->dmDriverExtra;
+        if (devModeSize < offsetof(DEVMODEW, dmFields) + sizeof(devMode->dmFields) ||
+            totalSize < devModeSize ||
+            offset + totalSize > presetBytes.size()) {
+            continue;
+        }
+        if (DevModeDeviceName(devMode) != printerName) {
+            continue;
+        }
+        return devMode;
+    }
+    return nullptr;
+}
+
+bool SetPrinterDevModeLevel9(HANDLE hPrinter, DEVMODEW *devMode) {
+    PRINTER_INFO_9W info = {0};
+    info.pDevMode = devMode;
+    if (SetPrinterW(hPrinter, 9, reinterpret_cast<LPBYTE>(&info), 0)) {
+        return true;
+    }
+    std::wcerr << L"SetPrinter level 9 failed. Error code: " << GetLastError() << std::endl;
+    return false;
+}
+
+bool SetPrinterDevModeLevel2(HANDLE hPrinter, DEVMODEW *devMode) {
+    DWORD needed = 0;
+    GetPrinterW(hPrinter, 2, NULL, 0, &needed);
+    if (needed == 0) {
+        std::wcerr << L"Failed to get printer information size. Error code: " << GetLastError()
+                   << std::endl;
+        return false;
+    }
+
+    std::vector<BYTE> printerInfoBytes(needed);
+    DWORD returned = 0;
+    auto *printerInfo = reinterpret_cast<PRINTER_INFO_2W *>(printerInfoBytes.data());
+    if (!GetPrinterW(hPrinter, 2, printerInfoBytes.data(), needed, &returned)) {
+        std::wcerr << L"Failed to get printer information. Error code: " << GetLastError()
+                   << std::endl;
+        return false;
+    }
+
+    printerInfo->pDevMode = devMode;
+    if (SetPrinterW(hPrinter, 2, printerInfoBytes.data(), 0)) {
+        return true;
+    }
+    std::wcerr << L"SetPrinter level 2 failed. Error code: " << GetLastError() << std::endl;
+    return false;
+}
+
+bool ApplyPrinterDevModeFromPreset(const std::string &printerNameUtf8,
+                                   const std::string &presetPathUtf8) {
+    const std::wstring printerName = Utf8ToWide(printerNameUtf8);
+    const std::wstring presetPath = Utf8ToWide(presetPathUtf8);
+    std::vector<BYTE> presetBytes = ReadBinaryFile(presetPath);
+    if (presetBytes.empty()) {
+        return false;
+    }
+
+    DEVMODEW *devMode = FindDevModeInPreset(presetBytes, printerName);
+    if (devMode == nullptr) {
+        std::wcerr << L"Could not find DEVMODE for printer in preset." << std::endl;
+        return false;
+    }
+
+    HANDLE hPrinter = NULL;
+    PRINTER_DEFAULTS useDefaults = {NULL, devMode, PRINTER_ACCESS_USE};
+    if (!OpenPrinterW(const_cast<LPWSTR>(printerName.c_str()), &hPrinter, &useDefaults)) {
+        std::wcerr << L"Failed to open printer for user DEVMODE. Error code: " << GetLastError()
+                   << std::endl;
+        return false;
+    }
+
+    const LONG documentPropertiesResult = DocumentPropertiesW(
+            NULL, hPrinter, const_cast<LPWSTR>(printerName.c_str()), devMode, devMode,
+            DM_IN_BUFFER | DM_OUT_BUFFER);
+    if (documentPropertiesResult < 0) {
+        std::wcerr << L"DocumentProperties failed while validating preset DEVMODE." << std::endl;
+    }
+
+    const bool userModeChanged = SetPrinterDevModeLevel9(hPrinter, devMode);
+    ClosePrinter(hPrinter);
+
+    PRINTER_DEFAULTS adminDefaults = {NULL, devMode, PRINTER_ALL_ACCESS};
+    if (!OpenPrinterW(const_cast<LPWSTR>(printerName.c_str()), &hPrinter, &adminDefaults)) {
+        std::wcerr << L"Failed to open printer for global DEVMODE. Error code: " << GetLastError()
+                   << std::endl;
+        return userModeChanged;
+    }
+    const bool globalModeChanged = SetPrinterDevModeLevel2(hPrinter, devMode);
+    ClosePrinter(hPrinter);
+    return userModeChanged || globalModeChanged;
 }
 
 std::vector <JobInfo> GetPrintJobQueue(LPCWSTR printerName) {
@@ -307,6 +443,16 @@ void methodHandlers(const flutter::MethodCall<> &call,
                 call.arguments());
         auto commandValue = (argsList->find(flutter::EncodableValue("command")))->second;
         std::string commandUtf8 = std::get<std::string>(commandValue);
+        auto printerNameIt = argsList->find(flutter::EncodableValue("printer_name"));
+        auto presetPathIt = argsList->find(flutter::EncodableValue("preset_path"));
+        if (printerNameIt != argsList->end() && presetPathIt != argsList->end()) {
+            std::string printerNameUtf8 = std::get<std::string>(printerNameIt->second);
+            std::string presetPathUtf8 = std::get<std::string>(presetPathIt->second);
+            if (ApplyPrinterDevModeFromPreset(printerNameUtf8, presetPathUtf8)) {
+                (*result)->Success(true);
+                return;
+            }
+        }
         (*result)->Success(RunPrintUiCommand(commandUtf8));
 
     } else if (call.method_name().compare("get_printer_status") == 0) {
