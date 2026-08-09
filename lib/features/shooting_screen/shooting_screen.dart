@@ -135,58 +135,13 @@ class _ShootingScreenState extends BasePageState<ShootingScreenListenState,
           final imagePath = call.arguments as String;
           logD('Canon file_created: $imagePath');
 
-          await _handleSavedCapture(
-            startCanonRecordingWhenContinuing: true,
-          );
-          if (mounted) {
-            setState(() {
-              _lastCapturedImagePath = imagePath;
-            });
-          }
           await provider.saveImage(
             imagePath: imagePath,
             targetAspectRatio: captureAspectRatio.aspectRatio,
           );
-          if (mounted) {
-            setState(() {
-              _lastCapturedImagePath =
-                  provider.latestPreviewImagePath ?? imagePath;
-            });
-          }
-          if (provider.uiImages.length < shotCount) {
-            _commonCounterController.reset();
-            await _startLiveViewRecordingForNextShot();
-          } else {
-            if (mounted) {
-              _commonCounterController.stop();
-              provider.onNextEvent();
-              Future.delayed(Duration(seconds: 1)).then((_) {
-                getIt.get<CameraPowerUtil>().turnOffCamera();
-                final keys =
-                    "Ctrl+Alt+Shift+Q".split('+').map((k) => k.trim()).toList();
-
-                for (var key in keys) {
-                  final keyCode = keyCodeMap[key];
-                  if (keyCode != null) {
-                    keyDown(keyCode);
-                  } else {
-                    logU('⚠️ Không tìm thấy phím "$key"');
-                  }
-                }
-                Future.delayed(Duration(milliseconds: 200)).then((_) {
-                  for (var key in keys) {
-                    final keyCode = keyCodeMap[key];
-                    if (keyCode != null) {
-                      keyUp(keyCode);
-                    } else {
-                      logU('⚠️ Không tìm thấy phím "$key"');
-                    }
-                  }
-                });
-              });
-              // navigator.replaceAll([PhotoSelectionRoute(files: provider.files)]);
-            }
-          }
+          await _handleSavedCapture(
+            startCanonRecordingWhenContinuing: true,
+          );
         } else if (call.method == 'video_created') {
           final videoPath = call.arguments as String;
           logD('Canon video_created: $videoPath');
@@ -451,12 +406,6 @@ class _ShootingScreenState extends BasePageState<ShootingScreenListenState,
           imagePath: imagePath,
           targetAspectRatio: captureAspectRatio.aspectRatio,
         );
-        if (mounted) {
-          setState(() {
-            _lastCapturedImagePath =
-                provider.latestPreviewImagePath ?? imagePath;
-          });
-        }
         _shutter.value = true;
         await _handleSavedCapture();
       } else {

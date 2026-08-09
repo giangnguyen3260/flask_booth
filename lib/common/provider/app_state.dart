@@ -34,7 +34,7 @@ import 'package:uuid/uuid.dart';
 @singleton
 class AppState extends ChangeNotifier with LogMixin {
   static const String _fallbackAppDataAsset =
-      'assets/dummy/local_main_info.json';
+      'assets/dummy/photobooth_info.json';
   static const int _maxAdminDataBackups = 10;
   static const String _adminDataBackupFolder = 'admin_data_backups';
   static const String _adminDataCurrentFile = 'admin_data_current.json';
@@ -409,8 +409,17 @@ class AppState extends ChangeNotifier with LogMixin {
     if (value.isEmpty) {
       return null;
     }
-    final resolved = await _resolveImagePath(value);
-    return resolved.isEmpty ? null : resolved;
+    try {
+      final resolved = await _resolveImagePath(value);
+      return resolved.isEmpty ? null : resolved;
+    } catch (error, stackTrace) {
+      if (!_shouldUseFallbackAppData) {
+        rethrow;
+      }
+      logE(error, stackTrace: stackTrace);
+      logD('Skip local fallback asset that could not be resolved: $value');
+      return null;
+    }
   }
 
   Future<BackgroundInfo> _fallbackBackgroundInfo(FramesInfo frameInfo) async {
@@ -535,7 +544,9 @@ class AppState extends ChangeNotifier with LogMixin {
     final previousSelectedFrameCode = imageParam.selectedFrame.frameCd;
     final previousSelectedBackgroundCode = imageParam.selectedBackground.bgCd;
     try {
-      final remoteData = await _fetchRemoteAppData(_adminDataReloadTimeout);
+      final remoteData = _shouldUseFallbackAppData
+          ? await _loadFallbackAppData()
+          : await _fetchRemoteAppData(_adminDataReloadTimeout);
       final prepareStopwatch = Stopwatch()..start();
       final preparedData = await _prepareAppData(remoteData);
       logD(

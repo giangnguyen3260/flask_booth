@@ -746,7 +746,7 @@
       {
         "configKey": "ENABLE_SHOT_REVIEW",
         "value": {
-          "enabled": false
+          "enabled": true
         }
       }
     ]
