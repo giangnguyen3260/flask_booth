@@ -18,6 +18,7 @@ class AppRouter extends RootStackRouter {
           page: ChooseFrameQuantityRoute.page,
         ),
         AutoRoute(page: PaymentRouteRoute.page),
+        AutoRoute(page: BeautyPreviewRoute.page),
         AutoRoute(page: ShootingGuideRouteRoute.page),
         AutoRoute(
           page: ShootingRoute.page,

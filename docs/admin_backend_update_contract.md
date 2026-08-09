@@ -59,6 +59,35 @@ Requirements:
 - `configInfo.configVersion` must equal `/pub/main-info/version.version`.
 - The returned data should represent the currently published admin snapshot.
 
+## Runtime Options
+
+Admin can control kiosk runtime options through `configInfo.appConfig`.
+
+### Shot Review / Retake
+
+Add an admin checkbox such as `Preview photo and allow retake after each shot`.
+When enabled, return:
+
+```json
+{
+  "configKey": "ENABLE_SHOT_REVIEW",
+  "value": {
+    "enabled": true
+  }
+}
+```
+
+When disabled, either return `enabled: false` or omit the config item. The kiosk
+defaults to the current behavior when this option is absent.
+
+Supported equivalent keys for compatibility:
+
+- `ENABLE_SHOT_REVIEW`
+- `SHOT_REVIEW_ENABLED`
+- `ALLOW_RETAKE_AFTER_SHOT`
+
+Publishing this option must increment `configInfo.configVersion`.
+
 ## Version Bump Rules
 
 Increment `configVersion` whenever a published admin change affects kiosk runtime behavior.
@@ -171,4 +200,3 @@ Backend/admin work is complete when:
 - Asset URLs are directly downloadable from kiosk.
 - `/pub/submit` retry with the same `saleNo` does not create duplicates.
 - `/pub/submit` retry returns a usable `qrUrl` once upload exists.
-

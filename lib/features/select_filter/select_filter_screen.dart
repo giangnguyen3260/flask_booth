@@ -30,7 +30,7 @@ class _SelectFilterScreenState extends BasePageState<SelectFilterListenState,
   @override
   void onNext(SelectFilterProvider provider) {
     super.onNext(provider);
-    navigator.replaceAll([ShootingGuideRouteRoute()]);
+    navigator.replaceAll([BeautyPreviewRoute()]);
   }
 
   @override

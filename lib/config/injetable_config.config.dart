@@ -28,6 +28,8 @@ import '../common/util/qr_utils.dart' as _i203;
 import '../common/util/remote_image_utils.dart' as _i1016;
 import '../features/background_selection/provider/background_selection_provider.dart'
     as _i782;
+import '../features/beauty_preview/provider/beauty_preview_provider.dart'
+    as _i1014;
 import '../features/choose_frame/provider/choose_frame_provider.dart' as _i109;
 import '../features/choose_frame_quantity/provider/choose_frame_quantity_provider.dart'
     as _i258;
@@ -66,6 +68,8 @@ extension GetItInjectableX on _i174.GetIt {
         () => _i782.BackgroundSelectionProvider());
     gh.factory<_i832.SelectFilterProvider>(() => _i832.SelectFilterProvider());
     gh.factory<_i109.ChooseFrameProvider>(() => _i109.ChooseFrameProvider());
+    gh.factory<_i1014.BeautyPreviewProvider>(
+        () => _i1014.BeautyPreviewProvider());
     gh.factory<_i258.ChooseFrameQuantityProvider>(
         () => _i258.ChooseFrameQuantityProvider());
     gh.factory<_i107.StandByProvider>(() => _i107.StandByProvider());

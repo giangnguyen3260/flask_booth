@@ -109,7 +109,7 @@ class PaymentScreenProvider extends BaseProvider<PaymentScreenListenState> {
       _hasCompletedPayment = true;
       Future.delayed(Duration(milliseconds: 500), () {
         resetBillAcceptor();
-        navigator.replaceAll([ShootingGuideRouteRoute()]);
+        navigator.replaceAll([BeautyPreviewRoute()]);
       });
     }
   }

@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter_shaders/flutter_shaders.dart';
 import 'package:project_l/common/models/effect.dart';
@@ -10,6 +9,27 @@ class CommonShaderImage extends StatelessWidget {
 
   final Effect effect;
   final String imagePath;
+
+  @override
+  Widget build(BuildContext context) {
+    return CommonShaderEffect(
+      effect: effect,
+      child: CommonImageFile(
+        path: imagePath,
+      ),
+    );
+  }
+}
+
+class CommonShaderEffect extends StatelessWidget {
+  const CommonShaderEffect({
+    super.key,
+    required this.effect,
+    required this.child,
+  });
+
+  final Effect effect;
+  final Widget child;
 
   @override
   Widget build(BuildContext context) {
@@ -40,9 +60,7 @@ class CommonShaderImage extends StatelessWidget {
             Paint()..shader = shader,
           );
         },
-        child: CommonImageFile(
-          path: imagePath,
-        ),
+        child: child!,
       );
     }, assetKey: 'shaders/filters.frag');
   }

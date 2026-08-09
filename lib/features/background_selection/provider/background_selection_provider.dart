@@ -30,6 +30,7 @@ class BackgroundSelectionProvider
   List<PresetCategory> presetCategory = [];
 
   void initPreset() async {
+    effect = appState.imageParam.effect ?? Effect();
     var vscoPreset = await rootBundle.loadString(Assets.files.filter);
     final jsonData = jsonDecode(vscoPreset) as List<dynamic>;
 

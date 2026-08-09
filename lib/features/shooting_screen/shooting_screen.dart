@@ -65,6 +65,8 @@ class _ShootingScreenState extends BasePageState<ShootingScreenListenState,
   bool _hasStartedShooting = false;
   bool _hasStartedReadyCountdown = false;
   bool _hasCanonSession = false;
+  late final bool _isShotReviewEnabled = appState.isShotReviewEnabled;
+  bool _isShotReviewVisible = false;
 
   @override
   bool isFooterEnabled() {
@@ -80,9 +82,7 @@ class _ShootingScreenState extends BasePageState<ShootingScreenListenState,
   Timer? _canonPreviewTimer;
   _LiveViewShotRecorder? _liveViewShotRecorder;
   String? _mockCapturePath;
-  String? _lastCapturedImagePath;
   int? _canonTextureId;
-  bool _isCanonRecording = false;
   int _canonShotVideoIndex = 0;
 
   final ValueNotifier<bool> _shutter = ValueNotifier(false);
@@ -134,46 +134,10 @@ class _ShootingScreenState extends BasePageState<ShootingScreenListenState,
         if (call.method == 'file_created') {
           final imagePath = call.arguments as String;
           logD('Canon file_created: $imagePath');
-          if (mounted) {
-            setState(() {
-              _lastCapturedImagePath = imagePath;
-            });
-          }
           provider.saveImage(imagePath: imagePath);
-          if (provider.uiImages.length < shotCount) {
-            _commonCounterController.reset();
-            await _startLiveViewRecordingForNextShot();
-          } else {
-            if (mounted) {
-              _commonCounterController.stop();
-              provider.onNextEvent();
-              Future.delayed(Duration(seconds: 1)).then((_) {
-                getIt.get<CameraPowerUtil>().turnOffCamera();
-                final keys =
-                    "Ctrl+Alt+Shift+Q".split('+').map((k) => k.trim()).toList();
-
-                for (var key in keys) {
-                  final keyCode = keyCodeMap[key];
-                  if (keyCode != null) {
-                    keyDown(keyCode);
-                  } else {
-                    logU('⚠️ Không tìm thấy phím "$key"');
-                  }
-                }
-                Future.delayed(Duration(milliseconds: 200)).then((_) {
-                  for (var key in keys) {
-                    final keyCode = keyCodeMap[key];
-                    if (keyCode != null) {
-                      keyUp(keyCode);
-                    } else {
-                      logU('⚠️ Không tìm thấy phím "$key"');
-                    }
-                  }
-                });
-              });
-              // navigator.replaceAll([PhotoSelectionRoute(files: provider.files)]);
-            }
-          }
+          await _handleSavedCapture(
+            startCanonRecordingWhenContinuing: true,
+          );
         } else if (call.method == 'video_created') {
           final videoPath = call.arguments as String;
           logD('Canon video_created: $videoPath');
@@ -426,44 +390,16 @@ class _ShootingScreenState extends BasePageState<ShootingScreenListenState,
     }));
   }
 
-  Future<void> _startCanonRecordIfNeeded() async {
-    if (!isCanonCameraMode || !_hasCanonSession || _isCanonRecording) {
-      return;
-    }
-    final started = await appState.cameraUtils.startRecord();
-    logD('Canon startRecord=$started');
-    _isCanonRecording = started;
-  }
-
-  Future<void> _stopCanonRecordIfNeeded() async {
-    if (!_isCanonRecording) {
-      return;
-    }
-    final stopped = await appState.cameraUtils.stopRecord();
-    logD('Canon stopRecord=$stopped');
-    _isCanonRecording = !stopped;
-  }
-
   Future<void> _handleShotCountdown() async {
+    if (_isShotReviewVisible) {
+      return;
+    }
     if (_commonCounterController.currentCounter == 0) {
       if (isMockCameraMode) {
         final imagePath = await _ensureMockCapturePath();
         await provider.saveMockCapture(imagePath: imagePath);
-        if (mounted) {
-          setState(() {
-            _lastCapturedImagePath =
-                provider.latestPreviewImagePath ?? imagePath;
-          });
-        }
         _shutter.value = true;
-        if (provider.uiImages.length < shotCount) {
-          _commonCounterController.reset();
-        } else {
-          if (mounted) {
-            _commonCounterController.stop();
-            provider.onNextEvent();
-          }
-        }
+        await _handleSavedCapture();
       } else {
         final videoFile = await _stopVideoRecordingIfNeeded();
         _shutter.value = true;
@@ -474,20 +410,7 @@ class _ShootingScreenState extends BasePageState<ShootingScreenListenState,
             imagePath: imagePath,
             videoPath: videoFile?.path,
           );
-          if (mounted) {
-            setState(() {
-              _lastCapturedImagePath =
-                  provider.latestPreviewImagePath ?? imagePath;
-            });
-          }
-          if (provider.uiImages.length < shotCount) {
-            _commonCounterController.reset();
-          } else {
-            if (mounted) {
-              _commonCounterController.stop();
-              provider.onNextEvent();
-            }
-          }
+          await _handleSavedCapture();
           return;
         }
         if (videoFile != null) {
@@ -505,6 +428,108 @@ class _ShootingScreenState extends BasePageState<ShootingScreenListenState,
         await _startVideoRecordingIfNeeded();
       }
     }
+  }
+
+  Future<void> _handleSavedCapture({
+    bool startCanonRecordingWhenContinuing = false,
+  }) async {
+    if (_isShotReviewEnabled) {
+      _showShotReview();
+      return;
+    }
+    provider.acceptLatestCapture();
+    await _continueAfterAcceptedCapture(
+      startCanonRecordingWhenContinuing: startCanonRecordingWhenContinuing,
+    );
+  }
+
+  void _showShotReview() {
+    _commonCounterController.stop();
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _isShotReviewVisible = true;
+    });
+  }
+
+  Future<void> _acceptReviewedShot() async {
+    if (!_isShotReviewVisible) {
+      return;
+    }
+    provider.acceptLatestCapture();
+    if (mounted) {
+      setState(() {
+        _isShotReviewVisible = false;
+      });
+    }
+    await _continueAfterAcceptedCapture(
+      startCanonRecordingWhenContinuing: isCanonCameraMode && _hasCanonSession,
+    );
+  }
+
+  Future<void> _retakeReviewedShot() async {
+    if (!_isShotReviewVisible) {
+      return;
+    }
+    provider.discardLatestCapture();
+    if (mounted) {
+      setState(() {
+        _isShotReviewVisible = false;
+      });
+    }
+    if (provider.uiImages.length < shotCount) {
+      _commonCounterController.reset();
+      if (isCanonCameraMode && _hasCanonSession) {
+        await _startLiveViewRecordingForNextShot();
+      }
+    }
+  }
+
+  Future<void> _continueAfterAcceptedCapture({
+    required bool startCanonRecordingWhenContinuing,
+  }) async {
+    if (provider.uiImages.length < shotCount) {
+      _commonCounterController.reset();
+      if (startCanonRecordingWhenContinuing) {
+        await _startLiveViewRecordingForNextShot();
+      }
+      return;
+    }
+    if (!mounted) {
+      return;
+    }
+    _commonCounterController.stop();
+    provider.onNextEvent();
+    if (isCanonCameraMode) {
+      _resetSnapCameraLensAfterCanonShooting();
+    }
+  }
+
+  void _resetSnapCameraLensAfterCanonShooting() {
+    Future.delayed(Duration(seconds: 1)).then((_) {
+      getIt.get<CameraPowerUtil>().turnOffCamera();
+      final keys = "Ctrl+Alt+Shift+Q".split('+').map((k) => k.trim()).toList();
+
+      for (var key in keys) {
+        final keyCode = keyCodeMap[key];
+        if (keyCode != null) {
+          keyDown(keyCode);
+        } else {
+          logU('⚠️ Không tìm thấy phím "$key"');
+        }
+      }
+      Future.delayed(Duration(milliseconds: 200)).then((_) {
+        for (var key in keys) {
+          final keyCode = keyCodeMap[key];
+          if (keyCode != null) {
+            keyUp(keyCode);
+          } else {
+            logU('⚠️ Không tìm thấy phím "$key"');
+          }
+        }
+      });
+    });
   }
 
   Future<XFile?> _stopVideoRecordingIfNeeded() async {
@@ -686,6 +711,14 @@ class _ShootingScreenState extends BasePageState<ShootingScreenListenState,
                                 listenable: _shutter,
                               ),
                             ),
+                            if (_isShotReviewVisible)
+                              Positioned.fill(
+                                child: _ShotReviewOverlay(
+                                  imagePath: provider.latestPreviewImagePath,
+                                  onRetake: _retakeReviewedShot,
+                                  onAccept: _acceptReviewedShot,
+                                ),
+                              ),
                           ],
                         ),
                       ),
@@ -1359,6 +1392,145 @@ class _CapturedPhotoStrip extends StatelessWidget {
             fontWeight: FontWeight.w700,
             color: Colors.white.withValues(alpha: 0.35),
             height: 1,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ShotReviewOverlay extends StatelessWidget {
+  const _ShotReviewOverlay({
+    required this.imagePath,
+    required this.onRetake,
+    required this.onAccept,
+  });
+
+  final String? imagePath;
+  final VoidCallback onRetake;
+  final VoidCallback onAccept;
+
+  @override
+  Widget build(BuildContext context) {
+    final file =
+        imagePath == null || imagePath!.isEmpty ? null : File(imagePath!);
+    final hasImage = file != null && file.existsSync();
+
+    return ColoredBox(
+      color: Colors.black.withValues(alpha: 0.72),
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: 70.w, vertical: 46.h),
+        child: Column(
+          children: [
+            Text(
+              flashyBoothText(
+                context,
+                vi: 'Xem lại ảnh vừa chụp',
+                en: 'Review your photo',
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: style4272400.copyWith(
+                color: Colors.white,
+                fontSize: 40.sp,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            22.verticalSpace,
+            Expanded(
+              child: Center(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12.r),
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.12),
+                    ),
+                    child: hasImage
+                        ? Image.file(
+                            file,
+                            key: ValueKey(imagePath),
+                            fit: BoxFit.contain,
+                          )
+                        : Center(
+                            child: Icon(
+                              Icons.image_not_supported_outlined,
+                              size: 54.r,
+                              color: Colors.white.withValues(alpha: 0.62),
+                            ),
+                          ),
+                  ),
+                ),
+              ),
+            ),
+            26.verticalSpace,
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _ShotReviewButton(
+                  icon: Icons.replay,
+                  label: flashyBoothText(
+                    context,
+                    vi: 'Chụp lại',
+                    en: 'Retake',
+                  ),
+                  onTap: onRetake,
+                  isPrimary: false,
+                ),
+                22.horizontalSpace,
+                _ShotReviewButton(
+                  icon: Icons.check,
+                  label: flashyBoothText(
+                    context,
+                    vi: 'Dùng ảnh',
+                    en: 'Keep',
+                  ),
+                  onTap: onAccept,
+                  isPrimary: true,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ShotReviewButton extends StatelessWidget {
+  const _ShotReviewButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    required this.isPrimary,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final bool isPrimary;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 230.w,
+      height: 76.h,
+      child: FilledButton.icon(
+        onPressed: onTap,
+        style: FilledButton.styleFrom(
+          backgroundColor: isPrimary ? FlashyBoothColors.pink : Colors.white,
+          foregroundColor: isPrimary ? Colors.white : FlashyBoothColors.pink,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14.r),
+          ),
+        ),
+        icon: Icon(icon, size: 30.r),
+        label: Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: style24400.copyWith(
+            fontSize: 24.sp,
+            fontWeight: FontWeight.w900,
           ),
         ),
       ),

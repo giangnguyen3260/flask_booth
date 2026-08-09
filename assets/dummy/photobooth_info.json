@@ -741,6 +741,14 @@
         "nextScreenCd": "END",
         "value": 30
       }
+    ],
+    "appConfig": [
+      {
+        "configKey": "ENABLE_SHOT_REVIEW",
+        "value": {
+          "enabled": false
+        }
+      }
     ]
   }
 }

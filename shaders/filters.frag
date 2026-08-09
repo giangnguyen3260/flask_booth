@@ -83,6 +83,17 @@ sourceColor.rgb += noise;
 return sourceColor;
 }
 
+vec4 beautySoftenFilter(vec4 sourceColor, vec2 uv, float strength) {
+float amount = clamp(-strength * 4.0, 0.0, 0.35);
+vec2 texel = 1.0 / uScreenSize;
+vec4 blur = sourceColor * 0.36;
+blur += texture(uTexture, uv + vec2(texel.x, 0.0)) * 0.16;
+blur += texture(uTexture, uv - vec2(texel.x, 0.0)) * 0.16;
+blur += texture(uTexture, uv + vec2(0.0, texel.y)) * 0.16;
+blur += texture(uTexture, uv - vec2(0.0, texel.y)) * 0.16;
+return vec4(mix(sourceColor.rgb, blur.rgb, amount), sourceColor.a);
+}
+
 void main() {
     vec2 coord = FlutterFragCoord().xy; // Tọa độ fragment
     vec2 uv = coord / uScreenSize; // Tọa độ UV chuẩn hóa
@@ -105,6 +116,9 @@ void main() {
     // Áp dụng sepia
     adjustedColor = sepiaFilter(adjustedColor, uSepia);
 
-    // Áp dụng grain
-    fragColor = grainFilter(adjustedColor, uGrain, uv);
+    if (uGrain < 0.0) {
+        fragColor = beautySoftenFilter(adjustedColor, uv, uGrain);
+    } else {
+        fragColor = grainFilter(adjustedColor, uGrain, uv);
+    }
 }

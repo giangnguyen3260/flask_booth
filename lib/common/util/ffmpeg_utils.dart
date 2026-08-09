@@ -164,7 +164,15 @@ class FfmpegUtils {
         'br=${0.272 * amount}:bg=${0.534 * amount}:bb=${1 - 0.869 * amount}',
       );
     }
-    if (grain > FilterEnum.grain.getDefaultValue()) {
+    if (grain < FilterEnum.grain.getDefaultValue()) {
+      final strength = (-grain).clamp(0.0, 0.2);
+      final radius = 0.8 + strength * 8.0;
+      final lumaStrength = 0.25 + strength * 2.0;
+      filters.add(
+        'smartblur=lr=${radius.toStringAsFixed(2)}'
+        ':ls=${lumaStrength.toStringAsFixed(2)}:lt=2.0',
+      );
+    } else if (grain > FilterEnum.grain.getDefaultValue()) {
       final strength = (grain * 80).clamp(0.0, 100.0);
       filters.add('noise=alls=$strength:allf=t');
     }

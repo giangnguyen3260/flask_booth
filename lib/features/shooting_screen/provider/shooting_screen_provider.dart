@@ -24,6 +24,12 @@ class ShootingScreenProvider extends BaseProvider<ShootingScreenListenState> {
   String? get latestPreviewImagePath =>
       uiImages.lastOrNull ?? tImages.lastOrNull;
 
+  int _acceptedCaptureCount = 0;
+
+  bool get hasPendingReview => uiImages.length > _acceptedCaptureCount;
+
+  int get acceptedCaptureCount => _acceptedCaptureCount;
+
   int get shotCount {
     final value = appState.imageParam.selectedFrame.frameSetting?.shortCount ??
         appState.imageParam.selectedFrame.frameSetting?.numOfPhotos ??
@@ -44,6 +50,27 @@ class ShootingScreenProvider extends BaseProvider<ShootingScreenListenState> {
         },
       ),
     );
+    notifyListeners();
+  }
+
+  void acceptLatestCapture() {
+    _acceptedCaptureCount = uiImages.length;
+    logD('Shooting acceptLatestCapture: accepted=$_acceptedCaptureCount');
+    notifyListeners();
+  }
+
+  void discardLatestCapture() {
+    final imagePath = uiImages.isNotEmpty ? uiImages.removeLast() : null;
+    if (tImages.length > uiImages.length) {
+      tImages.removeLast();
+    }
+    if (tVideos.length > uiImages.length) {
+      tVideos.removeLast();
+    }
+    if (_acceptedCaptureCount > uiImages.length) {
+      _acceptedCaptureCount = uiImages.length;
+    }
+    logD('Shooting discardLatestCapture: image=$imagePath');
     notifyListeners();
   }
 
@@ -119,6 +146,7 @@ class ShootingScreenProvider extends BaseProvider<ShootingScreenListenState> {
   }
 
   void onNextEvent() async {
+    _acceptedCaptureCount = uiImages.length;
     isLoading = true;
     notifyListeners();
 

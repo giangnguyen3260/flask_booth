@@ -949,6 +949,17 @@ class AppState extends ChangeNotifier with LogMixin {
     return value;
   }
 
+  bool get isShotReviewEnabled {
+    return getAppConfigBool("ENABLE_SHOT_REVIEW") ||
+        getAppConfigBool("SHOT_REVIEW_ENABLED") ||
+        getAppConfigBool("ALLOW_RETAKE_AFTER_SHOT");
+  }
+
+  bool getAppConfigBool(String configKey) {
+    final value = getAppConfigValue(configKey).trim().toLowerCase();
+    return value == "true" || value == "1" || value == "y" || value == "yes";
+  }
+
   String getAppConfigValue(String configKey) {
     final items = appData.configInfo?.appConfig ?? [];
     AppConfigItem? config;
@@ -963,6 +974,7 @@ class AppState extends ChangeNotifier with LogMixin {
       return "";
     }
     const preferredFields = [
+      "enabled",
       "guideText",
       "text",
       "message",
