@@ -112,11 +112,11 @@ class AppState extends ChangeNotifier with LogMixin {
     try {
       await _loadLocalConfig();
       await _loadAppVersion();
+      _startHeartbeat();
       await _loadRemoteData();
       _applyDefaultLocale();
       isInitSuccess = true;
       notifyListeners();
-      _startHeartbeat();
       async.unawaited(sendPrinterStatusReport());
     } catch (e, stackTrace) {
       logE(e, stackTrace: stackTrace);

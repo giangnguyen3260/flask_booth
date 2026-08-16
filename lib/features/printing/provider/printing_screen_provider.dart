@@ -17,6 +17,12 @@ import 'package:project_l/features/printing/provider/printing_screen_listen_stat
 
 @injectable
 class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
+  static const int _verticalPrintQrSize = 110;
+  static const int _horizontalPrintQrSize = 200;
+  static const int _printQrMargin = 10;
+  static const int _verticalPrintQrRightMargin = 40;
+  static const int _horizontalPrintQrMargin = 40;
+
   final FfmpegUtils _ffmpegUtils;
   final PrinterUtils _printerUtils;
   final QrUtils _qrUtils;
@@ -234,6 +240,9 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
           printingImage = await _ffmpegUtils.overlayQrOnImage(
             imagePath: printingImage,
             qrBytes: qrCode,
+            qrSize: _resolvePrintQrSize(),
+            marginRight: _resolvePrintQrMarginRight(),
+            marginBottom: _resolvePrintQrMarginBottom(),
           );
           logD('Printing overlay QR done: $printingImage');
         }
@@ -389,6 +398,34 @@ class PrintingScreenProvider extends BaseProvider<PrintingScreenListenState> {
     return appState.imageParam.videos
         .where((path) => path.isNotEmpty && File(path).existsSync())
         .toList();
+  }
+
+  int _resolvePrintQrSize() {
+    return _selectedBackgroundVerticalYn == 'Y'
+        ? _verticalPrintQrSize
+        : _horizontalPrintQrSize;
+  }
+
+  int _resolvePrintQrMarginRight() {
+    if (_selectedBackgroundVerticalYn == 'N') {
+      return _horizontalPrintQrMargin;
+    }
+    if (_selectedBackgroundVerticalYn == 'Y') {
+      return _verticalPrintQrRightMargin;
+    }
+    return _printQrMargin;
+  }
+
+  int _resolvePrintQrMarginBottom() {
+    return _selectedBackgroundVerticalYn == 'N'
+        ? _horizontalPrintQrMargin
+        : _printQrMargin;
+  }
+
+  String? get _selectedBackgroundVerticalYn {
+    return appState.imageParam.selectedBackground.verticalYn
+        ?.trim()
+        .toUpperCase();
   }
 
   String _resolveQrUrl(String? apiQrUrl) {

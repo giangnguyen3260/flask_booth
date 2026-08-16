@@ -541,7 +541,11 @@ class FfmpegUtils {
     required List<int> qrBytes,
     int qrSize = 110,
     int margin = 30,
+    int? marginRight,
+    int? marginBottom,
   }) async {
+    final resolvedMarginRight = marginRight ?? margin;
+    final resolvedMarginBottom = marginBottom ?? margin;
     final qrTempPath = path.join(
       _savedImagePath,
       'qr_temp_${DateTimeUtils.format(date: DateTime.now(), format: "dd_MM_yyyy_HH_mm_ss")}.png',
@@ -560,7 +564,7 @@ class FfmpegUtils {
             '-i',
             qrTempPath,
             '-filter_complex',
-            '[1:v]scale=$qrSize:$qrSize[qr];[0:v][qr]overlay=W-w-$margin:H-h-$margin',
+            '[1:v]scale=$qrSize:$qrSize[qr];[0:v][qr]overlay=W-w-$resolvedMarginRight:H-h-$resolvedMarginBottom',
             '-frames:v',
             '1',
             '-c:v',
