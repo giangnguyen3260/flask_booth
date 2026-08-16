@@ -20,6 +20,7 @@ class BeautyPreviewProvider extends BaseProvider<BeautyPreviewListenState> {
 
   void setBeautyEnabled(bool enabled) {
     beautyEnabled = enabled;
+    appState.updateEffect(previewEffect);
     notifyListeners();
   }
 

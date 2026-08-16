@@ -7,7 +7,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:path/path.dart' as path;
+import 'package:project_l/common/constants/beauty_effect.dart';
 import 'package:project_l/common/extensions/widget_extensions.dart';
+import 'package:project_l/common/models/effect.dart';
 import 'package:project_l/common/navigator/app_router.gr.dart';
 import 'package:project_l/common/provider/base_page_state.dart';
 import 'package:project_l/common/util/directory_utils.dart';
@@ -16,6 +18,7 @@ import 'package:project_l/features/photo_selection/provider/photo_selection_scre
 import 'package:project_l/features/photo_selection/provider/photo_selection_screen_provider.dart';
 import 'package:project_l/resources/app_text_style.dart';
 import 'package:project_l/resources/components/common_image_file.dart';
+import 'package:project_l/resources/components/live_beauty_filter.dart';
 import 'package:project_l/resources/flashy_booth_theme.dart';
 
 @RoutePage()
@@ -319,6 +322,7 @@ class _PhotoSelectionScreenState extends BasePageState<
                             index: index,
                             selectedIndex: selectedIndex,
                             isFlip: provider.isFlip,
+                            effect: appState.imageParam.effect ?? Effect(),
                             onTap: () => provider.selectImage(
                               imagePath: image,
                             ),
@@ -368,6 +372,7 @@ class _PhotoSelectionScreenState extends BasePageState<
                         selectedImages: provider.tempData,
                         selectedSlotIndex: provider.selectedSlotIndex,
                         isFlip: provider.isFlip,
+                        effect: appState.imageParam.effect ?? Effect(),
                         onSlotTap: provider.selectSlot,
                         onImageTap: provider.removeImageAt,
                       ),
@@ -476,6 +481,7 @@ class _ShotTile extends StatelessWidget {
     required this.index,
     required this.selectedIndex,
     required this.isFlip,
+    required this.effect,
     required this.onTap,
   });
 
@@ -483,6 +489,7 @@ class _ShotTile extends StatelessWidget {
   final int index;
   final int selectedIndex;
   final bool isFlip;
+  final Effect effect;
   final VoidCallback onTap;
 
   @override
@@ -523,12 +530,18 @@ class _ShotTile extends StatelessWidget {
                     Positioned.fill(
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(10.r),
-                        child: CommonImageFile(
-                          widgetWidth: double.infinity,
-                          widgetHeight: double.infinity,
-                          fit: BoxFit.cover,
-                          path: imagePath,
-                        ).flip(isFlip: isFlip),
+                        child: LiveBeautyFilter(
+                          enabled: BeautyEffect.isEnabled(effect),
+                          applyToneMatrix: !path
+                              .basename(imagePath)
+                              .startsWith('Processed_'),
+                          child: CommonImageFile(
+                            widgetWidth: double.infinity,
+                            widgetHeight: double.infinity,
+                            fit: BoxFit.cover,
+                            path: imagePath,
+                          ).flip(isFlip: isFlip),
+                        ),
                       ),
                     ),
                     Positioned(
@@ -591,6 +604,7 @@ class _SelectedSlotsPanel extends StatelessWidget {
     required this.selectedImages,
     required this.selectedSlotIndex,
     required this.isFlip,
+    required this.effect,
     required this.onSlotTap,
     required this.onImageTap,
   });
@@ -598,6 +612,7 @@ class _SelectedSlotsPanel extends StatelessWidget {
   final List<String> selectedImages;
   final int? selectedSlotIndex;
   final bool isFlip;
+  final Effect effect;
   final void Function({required int index}) onSlotTap;
   final void Function({required int index}) onImageTap;
 
@@ -657,6 +672,7 @@ class _SelectedSlotsPanel extends StatelessWidget {
                                   order: index + 1,
                                   isActive: selectedSlotIndex == index,
                                   isFlip: isFlip,
+                                  effect: effect,
                                   onTap: selectedImages[index].isEmpty
                                       ? () => onSlotTap(index: index)
                                       : () => onImageTap(index: index),
@@ -686,6 +702,7 @@ class _SelectedSlotTile extends StatelessWidget {
     required this.order,
     required this.isActive,
     required this.isFlip,
+    required this.effect,
     required this.onTap,
   });
 
@@ -693,6 +710,7 @@ class _SelectedSlotTile extends StatelessWidget {
   final int order;
   final bool isActive;
   final bool isFlip;
+  final Effect effect;
   final VoidCallback onTap;
 
   @override
@@ -719,12 +737,17 @@ class _SelectedSlotTile extends StatelessWidget {
                 ),
               )
             else
-              CommonImageFile(
-                widgetWidth: double.infinity,
-                widgetHeight: double.infinity,
-                fit: BoxFit.cover,
-                path: imagePath,
-              ).flip(isFlip: isFlip),
+              LiveBeautyFilter(
+                enabled: BeautyEffect.isEnabled(effect),
+                applyToneMatrix:
+                    !path.basename(imagePath).startsWith('Processed_'),
+                child: CommonImageFile(
+                  widgetWidth: double.infinity,
+                  widgetHeight: double.infinity,
+                  fit: BoxFit.cover,
+                  path: imagePath,
+                ).flip(isFlip: isFlip),
+              ),
             if (isActive || imagePath.isNotEmpty)
               Positioned.fill(
                 child: Container(

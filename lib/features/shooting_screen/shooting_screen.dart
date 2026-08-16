@@ -12,6 +12,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get_it/get_it.dart';
 import 'package:path/path.dart' as path;
+import 'package:project_l/common/constants/beauty_effect.dart';
 import 'package:project_l/common/constants/enum/e_aspect_ratio.dart';
 import 'package:project_l/common/navigator/app_router.gr.dart';
 import 'package:project_l/common/provider/base_page_state.dart';
@@ -25,6 +26,7 @@ import 'package:project_l/features/shooting_screen/provider/shooting_screen_list
 import 'package:project_l/features/shooting_screen/provider/shooting_screen_provider.dart';
 import 'package:project_l/resources/app_text_style.dart';
 import 'package:project_l/resources/components/common_counter.dart';
+import 'package:project_l/resources/components/live_beauty_filter.dart';
 import 'package:project_l/resources/flashy_booth_theme.dart';
 
 @RoutePage()
@@ -67,6 +69,9 @@ class _ShootingScreenState extends BasePageState<ShootingScreenListenState,
   bool _hasCanonSession = false;
   late final bool _isShotReviewEnabled = appState.isShotReviewEnabled;
   bool _isShotReviewVisible = false;
+
+  bool get _isBeautyFilterEnabled =>
+      BeautyEffect.isEnabled(appState.imageParam.effect);
 
   @override
   bool isFooterEnabled() {
@@ -578,6 +583,32 @@ class _ShootingScreenState extends BasePageState<ShootingScreenListenState,
     }
   }
 
+  Widget _buildLiveCapturePreview() {
+    final Widget preview;
+    if (isMockCameraMode) {
+      preview = const _CameraPreviewPlaceholder();
+    } else if (_canonTextureId != null) {
+      preview = _CanonCapturePreview(
+        imagePath: null,
+        textureId: _canonTextureId,
+        sourceAspectRatio: EAspectRatio.sixteenNine.aspectRatio,
+      );
+    } else if (controller != null) {
+      preview = CameraPreview(controller!);
+    } else {
+      preview = _CanonCapturePreview(
+        imagePath: null,
+        textureId: _canonTextureId,
+        sourceAspectRatio: EAspectRatio.sixteenNine.aspectRatio,
+      );
+    }
+
+    return LiveBeautyFilter(
+      enabled: !isMockCameraMode && _isBeautyFilterEnabled,
+      child: preview,
+    );
+  }
+
   @override
   void listenState(ShootingScreenListenState event) {
     if (event is ShootingScreenSuccessState) {
@@ -610,23 +641,7 @@ class _ShootingScreenState extends BasePageState<ShootingScreenListenState,
                         alignment: Alignment.center,
                         children: [
                           Positioned.fill(
-                            child: isMockCameraMode
-                                ? const _CameraPreviewPlaceholder()
-                                : _canonTextureId != null
-                                    ? _CanonCapturePreview(
-                                        imagePath: null,
-                                        textureId: _canonTextureId,
-                                        sourceAspectRatio: EAspectRatio
-                                            .sixteenNine.aspectRatio,
-                                      )
-                                    : controller != null
-                                        ? CameraPreview(controller!)
-                                        : _CanonCapturePreview(
-                                            imagePath: null,
-                                            textureId: _canonTextureId,
-                                            sourceAspectRatio: EAspectRatio
-                                                .sixteenNine.aspectRatio,
-                                          ),
+                            child: _buildLiveCapturePreview(),
                           ),
                           if (!isMockCameraMode && controller != null)
                             Positioned.fill(
@@ -686,23 +701,7 @@ class _ShootingScreenState extends BasePageState<ShootingScreenListenState,
                           alignment: Alignment.center,
                           children: [
                             Positioned.fill(
-                              child: isMockCameraMode
-                                  ? const _CameraPreviewPlaceholder()
-                                  : _canonTextureId != null
-                                      ? _CanonCapturePreview(
-                                          imagePath: null,
-                                          textureId: _canonTextureId,
-                                          sourceAspectRatio: EAspectRatio
-                                              .sixteenNine.aspectRatio,
-                                        )
-                                      : controller != null
-                                          ? CameraPreview(controller!)
-                                          : _CanonCapturePreview(
-                                              imagePath: null,
-                                              textureId: _canonTextureId,
-                                              sourceAspectRatio: EAspectRatio
-                                                  .sixteenNine.aspectRatio,
-                                            ),
+                              child: _buildLiveCapturePreview(),
                             ),
                             if (!isMockCameraMode && controller != null)
                               Positioned.fill(
@@ -715,6 +714,7 @@ class _ShootingScreenState extends BasePageState<ShootingScreenListenState,
                               child: _CapturedPhotoStrip(
                                 images: provider.uiImages,
                                 totalShots: shotCount,
+                                beautyFilterEnabled: _isBeautyFilterEnabled,
                               ),
                             ),
                             Positioned.fill(
@@ -732,6 +732,7 @@ class _ShootingScreenState extends BasePageState<ShootingScreenListenState,
                               Positioned.fill(
                                 child: _ShotReviewOverlay(
                                   imagePath: provider.latestPreviewImagePath,
+                                  beautyFilterEnabled: _isBeautyFilterEnabled,
                                   onRetake: _retakeReviewedShot,
                                   onAccept: _acceptReviewedShot,
                                 ),
@@ -1364,10 +1365,12 @@ class _CapturedPhotoStrip extends StatelessWidget {
   const _CapturedPhotoStrip({
     required this.images,
     required this.totalShots,
+    required this.beautyFilterEnabled,
   });
 
   final List<String> images;
   final int totalShots;
+  final bool beautyFilterEnabled;
 
   @override
   Widget build(BuildContext context) {
@@ -1391,12 +1394,18 @@ class _CapturedPhotoStrip extends StatelessWidget {
                   width: thumbSize,
                   height: thumbSize,
                   child: hasImage
-                      ? Image.file(
-                          File(images[i]),
-                          key: ValueKey(images[i]),
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) =>
-                              _emptyThumb(i, thumbSize),
+                      ? LiveBeautyFilter(
+                          enabled: beautyFilterEnabled,
+                          applyToneMatrix: !path
+                              .basename(images[i])
+                              .startsWith('Processed_'),
+                          child: Image.file(
+                            File(images[i]),
+                            key: ValueKey(images[i]),
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) =>
+                                _emptyThumb(i, thumbSize),
+                          ),
                         )
                       : _emptyThumb(i, thumbSize),
                 ),
@@ -1430,11 +1439,13 @@ class _CapturedPhotoStrip extends StatelessWidget {
 class _ShotReviewOverlay extends StatelessWidget {
   const _ShotReviewOverlay({
     required this.imagePath,
+    required this.beautyFilterEnabled,
     required this.onRetake,
     required this.onAccept,
   });
 
   final String? imagePath;
+  final bool beautyFilterEnabled;
   final VoidCallback onRetake;
   final VoidCallback onAccept;
 
@@ -1474,10 +1485,13 @@ class _ShotReviewOverlay extends StatelessWidget {
                       color: Colors.white.withValues(alpha: 0.12),
                     ),
                     child: hasImage
-                        ? Image.file(
-                            file,
-                            key: ValueKey(imagePath),
-                            fit: BoxFit.contain,
+                        ? LiveBeautyFilter(
+                            enabled: beautyFilterEnabled,
+                            child: Image.file(
+                              file,
+                              key: ValueKey(imagePath),
+                              fit: BoxFit.contain,
+                            ),
                           )
                         : Center(
                             child: Icon(
@@ -1501,6 +1515,11 @@ class _ShotReviewOverlay extends StatelessWidget {
                     vi: 'Chụp lại',
                     en: 'Retake',
                   ),
+                  subLabel: flashyBoothSecondaryText(
+                    context,
+                    vi: 'Chụp lại',
+                    en: 'Retake',
+                  ),
                   onTap: onRetake,
                   isPrimary: false,
                 ),
@@ -1508,6 +1527,11 @@ class _ShotReviewOverlay extends StatelessWidget {
                 _ShotReviewButton(
                   icon: Icons.check,
                   label: flashyBoothText(
+                    context,
+                    vi: 'Dùng ảnh',
+                    en: 'Keep',
+                  ),
+                  subLabel: flashyBoothSecondaryText(
                     context,
                     vi: 'Dùng ảnh',
                     en: 'Keep',
@@ -1528,40 +1552,33 @@ class _ShotReviewButton extends StatelessWidget {
   const _ShotReviewButton({
     required this.icon,
     required this.label,
+    required this.subLabel,
     required this.onTap,
     required this.isPrimary,
   });
 
   final IconData icon;
   final String label;
+  final String subLabel;
   final VoidCallback onTap;
   final bool isPrimary;
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
+    return FlashyBoothPillButton(
+      label: label,
+      subLabel: subLabel,
+      onTap: onTap,
       width: 230.w,
       height: 76.h,
-      child: FilledButton.icon(
-        onPressed: onTap,
-        style: FilledButton.styleFrom(
-          backgroundColor: isPrimary ? FlashyBoothColors.pink : Colors.white,
-          foregroundColor: isPrimary ? Colors.white : FlashyBoothColors.pink,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14.r),
-          ),
-        ),
-        icon: Icon(icon, size: 30.r),
-        label: Text(
-          label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: style24400.copyWith(
-            fontSize: 24.sp,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-      ),
+      labelSize: 27.sp,
+      subLabelSize: 14.sp,
+      backgroundColor: isPrimary ? FlashyBoothColors.pink : Colors.white,
+      labelColor: isPrimary ? Colors.white : FlashyBoothColors.pink,
+      subLabelColor: isPrimary
+          ? Colors.white.withValues(alpha: 0.72)
+          : FlashyBoothColors.pink.withValues(alpha: 0.68),
+      elevation: isPrimary ? 12 : 0,
     );
   }
 }

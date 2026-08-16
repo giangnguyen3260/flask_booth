@@ -3,13 +3,12 @@ import 'package:camera/camera.dart';
 import 'package:camera_platform_interface/camera_platform_interface.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:project_l/common/models/effect.dart';
 import 'package:project_l/common/navigator/app_router.gr.dart';
 import 'package:project_l/common/provider/base_page_state.dart';
 import 'package:project_l/features/beauty_preview/provider/beauty_preview_listen_state.dart';
 import 'package:project_l/features/beauty_preview/provider/beauty_preview_provider.dart';
 import 'package:project_l/resources/app_text_style.dart';
-import 'package:project_l/resources/components/common_shader_image.dart';
+import 'package:project_l/resources/components/live_beauty_filter.dart';
 import 'package:project_l/resources/flashy_booth_theme.dart';
 
 @RoutePage()
@@ -133,7 +132,7 @@ class _BeautyPreviewScreenState extends BasePageState<BeautyPreviewListenState,
                   final preview = _BeautyCameraPreview(
                     controller: _controller,
                     isLoading: _isCameraLoading,
-                    effect: provider.previewEffect,
+                    beautyEnabled: provider.beautyEnabled,
                   );
 
                   final tools = _BeautyPreviewTools(
@@ -180,12 +179,12 @@ class _BeautyCameraPreview extends StatelessWidget {
   const _BeautyCameraPreview({
     required this.controller,
     required this.isLoading,
-    required this.effect,
+    required this.beautyEnabled,
   });
 
   final CameraController? controller;
   final bool isLoading;
-  final Effect effect;
+  final bool beautyEnabled;
 
   @override
   Widget build(BuildContext context) {
@@ -202,14 +201,35 @@ class _BeautyCameraPreview extends StatelessWidget {
       child: AnimatedSwitcher(
         duration: const Duration(milliseconds: 180),
         child: controller != null && controller!.value.isInitialized
-            ? CommonShaderEffect(
-                effect: effect,
-                child: Transform.flip(
-                  flipX: true,
-                  child: CameraPreview(controller!),
-                ),
+            ? LiveBeautyFilter(
+                enabled: beautyEnabled,
+                child: _BeautyCameraFeed(controller: controller!),
               )
             : _BeautyPreviewPlaceholder(isLoading: isLoading),
+      ),
+    );
+  }
+}
+
+class _BeautyCameraFeed extends StatelessWidget {
+  const _BeautyCameraFeed({required this.controller});
+
+  final CameraController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final aspectRatio = controller.value.aspectRatio;
+    return ClipRect(
+      child: FittedBox(
+        fit: BoxFit.cover,
+        child: SizedBox(
+          width: aspectRatio * 1000,
+          height: 1000,
+          child: Transform.flip(
+            flipX: true,
+            child: CameraPreview(controller),
+          ),
+        ),
       ),
     );
   }
@@ -304,22 +324,18 @@ class _BeautyPreviewTools extends StatelessWidget {
         42.verticalSpace,
         Align(
           alignment: Alignment.centerLeft,
-          child: FilledButton(
-            onPressed: onContinue,
-            child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: 30.w, vertical: 18.h),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    flashyBoothText(context, vi: 'Tiếp tục', en: 'Continue'),
-                    style: style32500,
-                  ),
-                  12.horizontalSpace,
-                  Icon(Icons.arrow_forward, size: 34.r),
-                ],
-              ),
+          child: FlashyBoothPillButton(
+            label: flashyBoothText(context, vi: 'Tiếp tục', en: 'Continue'),
+            subLabel: flashyBoothSecondaryText(
+              context,
+              vi: 'Tiếp tục',
+              en: 'Continue',
             ),
+            onTap: onContinue,
+            width: 296.w,
+            height: 82.h,
+            labelSize: 30.sp,
+            subLabelSize: 15.sp,
           ),
         ),
       ],
@@ -343,14 +359,16 @@ class _BeautyModeButton extends StatelessWidget {
     return OutlinedButton(
       onPressed: onTap,
       style: OutlinedButton.styleFrom(
-        padding: EdgeInsets.symmetric(horizontal: 18.w, vertical: 24.h),
+        fixedSize: Size.fromHeight(58.h),
+        padding: EdgeInsets.symmetric(horizontal: 18.w),
         side: BorderSide(
           color: selected ? FlashyBoothColors.pink : Colors.black26,
-          width: selected ? 3.w : 1.w,
+          width: 2.w,
         ),
         backgroundColor: selected
-            ? FlashyBoothColors.pink.withValues(alpha: 0.12)
-            : Colors.white.withValues(alpha: 0.44),
+            ? FlashyBoothColors.pink.withValues(alpha: 0.14)
+            : Colors.white.withValues(alpha: 0.54),
+        shape: const StadiumBorder(),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,

@@ -33,7 +33,7 @@ class CommonShaderEffect extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ShaderBuilder((context, shader, child) {
+    return ShaderBuilder((context, shader, _) {
       return AnimatedSampler(
         (image, size, canvas) {
           shader.setFloatUniforms((uniforms) {
@@ -60,7 +60,7 @@ class CommonShaderEffect extends StatelessWidget {
             Paint()..shader = shader,
           );
         },
-        child: child!,
+        child: child,
       );
     }, assetKey: 'shaders/filters.frag');
   }

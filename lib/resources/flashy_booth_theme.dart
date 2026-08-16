@@ -328,6 +328,8 @@ class FlashyBoothRoundNavButton extends StatelessWidget {
     required this.onTap,
     this.alignment = Alignment.center,
     this.enabled = true,
+    this.width,
+    this.height,
   });
 
   final String label;
@@ -335,20 +337,79 @@ class FlashyBoothRoundNavButton extends StatelessWidget {
   final VoidCallback onTap;
   final Alignment alignment;
   final bool enabled;
+  final double? width;
+  final double? height;
 
   @override
   Widget build(BuildContext context) {
+    return Align(
+      alignment: alignment,
+      widthFactor: 1,
+      heightFactor: 1,
+      child: FlashyBoothPillButton(
+        label: label,
+        subLabel: subLabel,
+        onTap: onTap,
+        enabled: enabled,
+        width: width ?? 236.w,
+        height: height ?? 88.h,
+        labelSize: 28.sp,
+        subLabelSize: 15.sp,
+      ),
+    );
+  }
+}
+
+class FlashyBoothPillButton extends StatelessWidget {
+  const FlashyBoothPillButton({
+    super.key,
+    required this.label,
+    required this.subLabel,
+    required this.onTap,
+    this.enabled = true,
+    this.width,
+    this.height,
+    this.labelSize,
+    this.subLabelSize,
+    this.backgroundColor,
+    this.labelColor,
+    this.subLabelColor,
+    this.elevation,
+  });
+
+  final String label;
+  final String subLabel;
+  final VoidCallback onTap;
+  final bool enabled;
+  final double? width;
+  final double? height;
+  final double? labelSize;
+  final double? subLabelSize;
+  final Color? backgroundColor;
+  final Color? labelColor;
+  final Color? subLabelColor;
+  final double? elevation;
+
+  @override
+  Widget build(BuildContext context) {
+    final baseBackground = backgroundColor ?? FlashyBoothColors.pink;
+    final effectiveBackground =
+        enabled ? baseBackground : baseBackground.withValues(alpha: 0.38);
+    final effectiveLabelColor = labelColor ?? Colors.white;
+    final effectiveSubLabelColor =
+        subLabelColor ?? Colors.white.withValues(alpha: 0.72);
+
     return Material(
-      color: enabled
-          ? FlashyBoothColors.pink
-          : FlashyBoothColors.pink.withValues(alpha: 0.38),
-      shape: const CircleBorder(),
+      color: effectiveBackground,
+      borderRadius: BorderRadius.circular(999.r),
+      elevation: enabled ? elevation ?? 12 : 0,
+      shadowColor: FlashyBoothColors.pink.withValues(alpha: 0.22),
       child: InkWell(
-        customBorder: const CircleBorder(),
+        borderRadius: BorderRadius.circular(999.r),
         onTap: enabled ? onTap : null,
         child: SizedBox(
-          width: 104.w,
-          height: 104.w,
+          width: width ?? 426.w,
+          height: height ?? 110.h,
           child: Center(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -359,22 +420,22 @@ class FlashyBoothRoundNavButton extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontFamily: 'Lexend',
-                    fontSize: 20.sp,
+                    fontSize: labelSize ?? 32.sp,
                     fontWeight: FontWeight.w900,
-                    color: Colors.white,
+                    color: effectiveLabelColor,
                     height: 1,
                   ),
                 ),
-                SizedBox(height: 5.h),
+                SizedBox(height: 8.h),
                 Text(
                   subLabel,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontFamily: 'Lexend',
-                    fontSize: 12.sp,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white.withValues(alpha: 0.72),
+                    fontSize: subLabelSize ?? 17.sp,
+                    fontWeight: FontWeight.w700,
+                    color: effectiveSubLabelColor,
                     height: 1,
                   ),
                 ),

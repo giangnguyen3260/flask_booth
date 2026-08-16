@@ -49,7 +49,8 @@ class _ShootingGuideScreenScreenState extends BasePageState<
   @override
   Widget buildPage(BuildContext context, maxWidth, maxHeight) {
     final frameSetting = appState.imageParam.selectedFrame.frameSetting;
-    final photoCount = frameSetting?.shortCount ?? frameSetting?.numOfPhotos ?? 10;
+    final photoCount =
+        frameSetting?.shortCount ?? frameSetting?.numOfPhotos ?? 10;
     final shotTime = frameSetting?.timePerShot ?? 10;
 
     return LayoutBuilder(
@@ -227,57 +228,20 @@ class _GetReadyButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: FlashyBoothColors.pink,
-      borderRadius: BorderRadius.circular(40.r),
-      elevation: 16,
-      shadowColor: FlashyBoothColors.pink.withValues(alpha: 0.24),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(40.r),
-        onTap: onTap,
-        child: SizedBox(
-          width: 426.w,
-          height: 110.h,
-          child: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  flashyBoothText(
-                    context,
-                    vi: 'Chuẩn bị chụp',
-                    en: 'Get ready',
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: style32500.copyWith(
-                    color: Colors.white,
-                    fontSize: 32.sp,
-                    fontWeight: FontWeight.w900,
-                    height: 1,
-                  ),
-                ),
-                SizedBox(height: 8.h),
-                Text(
-                  flashyBoothSecondaryText(
-                    context,
-                    vi: 'Chuẩn bị chụp',
-                    en: 'Get ready',
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: style24400.copyWith(
-                    color: Colors.white.withValues(alpha: 0.68),
-                    fontSize: 17.sp,
-                    fontWeight: FontWeight.w700,
-                    height: 1,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
+    return FlashyBoothPillButton(
+      label: flashyBoothText(
+        context,
+        vi: 'Chuẩn bị chụp',
+        en: 'Get ready',
       ),
+      subLabel: flashyBoothSecondaryText(
+        context,
+        vi: 'Chuẩn bị chụp',
+        en: 'Get ready',
+      ),
+      onTap: onTap,
+      width: 426.w,
+      height: 110.h,
     );
   }
 }
