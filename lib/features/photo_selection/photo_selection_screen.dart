@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:path/path.dart' as path;
+import 'package:project_l/common/constants/enum/e_aspect_ratio.dart';
 import 'package:project_l/common/constants/beauty_effect.dart';
 import 'package:project_l/common/extensions/widget_extensions.dart';
 import 'package:project_l/common/models/effect.dart';
@@ -41,6 +42,9 @@ class _PhotoSelectionScreenState extends BasePageState<
   List<String> _defaultSampleImages = [];
 
   late final int _requiredPhotoCount = _resolveRequiredPhotoCount();
+  late final EAspectRatio _captureAspectRatio = EAspectRatio.fromString(
+    appState.imageParam.selectedFrame.frameSetting?.captureAspectRatio,
+  );
 
   late final List<List<double>> _displayTransparentAreas =
       appState.imageParam.selectedFrame.getDisplayTransparentAreas(
@@ -89,6 +93,13 @@ class _PhotoSelectionScreenState extends BasePageState<
       return numOfPhotos;
     }
     return max(widget.files.length, 1);
+  }
+
+  double get _shotTileHeight {
+    final aspectRatio = _captureAspectRatio.aspectRatio;
+    final maxTileWidth = 390.w;
+    final imageHeight = maxTileWidth / aspectRatio;
+    return (imageHeight + 86.h).clamp(250.h, 520.h).toDouble();
   }
 
   @override
@@ -308,7 +319,7 @@ class _PhotoSelectionScreenState extends BasePageState<
                         padding: EdgeInsets.only(right: 26.w, bottom: 20.h),
                         gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
                           maxCrossAxisExtent: 390.w,
-                          mainAxisExtent: 318.h,
+                          mainAxisExtent: _shotTileHeight,
                           mainAxisSpacing: 30.h,
                           crossAxisSpacing: 28.w,
                         ),
@@ -323,6 +334,7 @@ class _PhotoSelectionScreenState extends BasePageState<
                             selectedIndex: selectedIndex,
                             isFlip: provider.isFlip,
                             effect: appState.imageParam.effect ?? Effect(),
+                            captureAspectRatio: _captureAspectRatio.aspectRatio,
                             onTap: () => provider.selectImage(
                               imagePath: image,
                             ),
@@ -373,6 +385,7 @@ class _PhotoSelectionScreenState extends BasePageState<
                         selectedSlotIndex: provider.selectedSlotIndex,
                         isFlip: provider.isFlip,
                         effect: appState.imageParam.effect ?? Effect(),
+                        captureAspectRatio: _captureAspectRatio.aspectRatio,
                         onSlotTap: provider.selectSlot,
                         onImageTap: provider.removeImageAt,
                       ),
@@ -482,6 +495,7 @@ class _ShotTile extends StatelessWidget {
     required this.selectedIndex,
     required this.isFlip,
     required this.effect,
+    required this.captureAspectRatio,
     required this.onTap,
   });
 
@@ -490,6 +504,7 @@ class _ShotTile extends StatelessWidget {
   final int selectedIndex;
   final bool isFlip;
   final Effect effect;
+  final double captureAspectRatio;
   final VoidCallback onTap;
 
   @override
@@ -518,30 +533,28 @@ class _ShotTile extends StatelessWidget {
       ),
       child: Padding(
         padding: EdgeInsets.all(10.r),
-        child: Column(
-          children: [
-            Expanded(
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: onTap,
+        child: Center(
+          child: AspectRatio(
+            aspectRatio: captureAspectRatio,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: onTap,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(10.r),
                 child: Stack(
                   clipBehavior: Clip.none,
                   children: [
                     Positioned.fill(
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(10.r),
-                        child: LiveBeautyFilter(
-                          enabled: BeautyEffect.isEnabled(effect),
-                          applyToneMatrix: !path
-                              .basename(imagePath)
-                              .startsWith('Processed_'),
-                          child: CommonImageFile(
-                            widgetWidth: double.infinity,
-                            widgetHeight: double.infinity,
-                            fit: BoxFit.cover,
-                            path: imagePath,
-                          ).flip(isFlip: isFlip),
-                        ),
+                      child: LiveBeautyFilter(
+                        enabled: BeautyEffect.isEnabled(effect),
+                        applyToneMatrix:
+                            !path.basename(imagePath).startsWith('Processed_'),
+                        child: CommonImageFile(
+                          widgetWidth: double.infinity,
+                          widgetHeight: double.infinity,
+                          fit: BoxFit.contain,
+                          path: imagePath,
+                        ).flip(isFlip: isFlip),
                       ),
                     ),
                     Positioned(
@@ -592,7 +605,7 @@ class _ShotTile extends StatelessWidget {
                 ),
               ),
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -605,6 +618,7 @@ class _SelectedSlotsPanel extends StatelessWidget {
     required this.selectedSlotIndex,
     required this.isFlip,
     required this.effect,
+    required this.captureAspectRatio,
     required this.onSlotTap,
     required this.onImageTap,
   });
@@ -613,6 +627,7 @@ class _SelectedSlotsPanel extends StatelessWidget {
   final int? selectedSlotIndex;
   final bool isFlip;
   final Effect effect;
+  final double captureAspectRatio;
   final void Function({required int index}) onSlotTap;
   final void Function({required int index}) onImageTap;
 
@@ -641,54 +656,32 @@ class _SelectedSlotsPanel extends StatelessWidget {
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final rowGap = 8.h;
           final columnGap = 8.w;
-          final minTileHeight = 86.h;
-          final availableHeight = constraints.maxHeight - (rowGap * (rows - 1));
-          final tileHeight =
-              rows == 0 ? constraints.maxHeight : availableHeight / rows;
-          final needsScroll = tileHeight < minTileHeight;
-
-          final grid = Column(
-            children: List.generate(rows, (rowIndex) {
+          final rowGap = 8.h;
+          final tileWidth =
+              (constraints.maxWidth - columnGap * (columns - 1)) / columns;
+          final tileHeight = tileWidth / captureAspectRatio;
+          final grid = Wrap(
+            spacing: columnGap,
+            runSpacing: rowGap,
+            children: List.generate(slotCount, (index) {
               return SizedBox(
-                height: needsScroll ? minTileHeight : tileHeight,
-                child: Padding(
-                  padding: EdgeInsets.only(
-                    bottom: rowIndex == rows - 1 ? 0 : rowGap,
-                  ),
-                  child: Row(
-                    children: List.generate(columns, (columnIndex) {
-                      final index = rowIndex * columns + columnIndex;
-                      return Expanded(
-                        child: Padding(
-                          padding: EdgeInsets.only(
-                            right: columnIndex == columns - 1 ? 0 : columnGap,
-                          ),
-                          child: index >= slotCount
-                              ? const SizedBox.shrink()
-                              : _SelectedSlotTile(
-                                  imagePath: selectedImages[index],
-                                  order: index + 1,
-                                  isActive: selectedSlotIndex == index,
-                                  isFlip: isFlip,
-                                  effect: effect,
-                                  onTap: selectedImages[index].isEmpty
-                                      ? () => onSlotTap(index: index)
-                                      : () => onImageTap(index: index),
-                                ),
-                        ),
-                      );
-                    }),
-                  ),
+                width: tileWidth,
+                height: tileHeight,
+                child: _SelectedSlotTile(
+                  imagePath: selectedImages[index],
+                  order: index + 1,
+                  isActive: selectedSlotIndex == index,
+                  isFlip: isFlip,
+                  effect: effect,
+                  captureAspectRatio: captureAspectRatio,
+                  onTap: selectedImages[index].isEmpty
+                      ? () => onSlotTap(index: index)
+                      : () => onImageTap(index: index),
                 ),
               );
             }),
           );
-
-          if (!needsScroll) {
-            return grid;
-          }
           return SingleChildScrollView(child: grid);
         },
       ),
@@ -703,6 +696,7 @@ class _SelectedSlotTile extends StatelessWidget {
     required this.isActive,
     required this.isFlip,
     required this.effect,
+    required this.captureAspectRatio,
     required this.onTap,
   });
 
@@ -711,6 +705,7 @@ class _SelectedSlotTile extends StatelessWidget {
   final bool isActive;
   final bool isFlip;
   final Effect effect;
+  final double captureAspectRatio;
   final VoidCallback onTap;
 
   @override
@@ -718,54 +713,59 @@ class _SelectedSlotTile extends StatelessWidget {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(4.r),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            if (imagePath.isEmpty)
-              Container(
-                color: const Color(0xFFE4E0D9),
-                alignment: Alignment.center,
-                child: Text(
-                  '+',
-                  style: style24400.copyWith(
-                    color: Colors.black.withValues(alpha: 0.20),
-                    fontSize: 22.sp,
-                    fontWeight: FontWeight.w800,
+      child: Center(
+        child: AspectRatio(
+          aspectRatio: captureAspectRatio,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(4.r),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                if (imagePath.isEmpty)
+                  Container(
+                    color: const Color(0xFFE4E0D9),
+                    alignment: Alignment.center,
+                    child: Text(
+                      '+',
+                      style: style24400.copyWith(
+                        color: Colors.black.withValues(alpha: 0.20),
+                        fontSize: 22.sp,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  )
+                else
+                  LiveBeautyFilter(
+                    enabled: BeautyEffect.isEnabled(effect),
+                    applyToneMatrix:
+                        !path.basename(imagePath).startsWith('Processed_'),
+                    child: CommonImageFile(
+                      widgetWidth: double.infinity,
+                      widgetHeight: double.infinity,
+                      fit: BoxFit.contain,
+                      path: imagePath,
+                    ).flip(isFlip: isFlip),
                   ),
-                ),
-              )
-            else
-              LiveBeautyFilter(
-                enabled: BeautyEffect.isEnabled(effect),
-                applyToneMatrix:
-                    !path.basename(imagePath).startsWith('Processed_'),
-                child: CommonImageFile(
-                  widgetWidth: double.infinity,
-                  widgetHeight: double.infinity,
-                  fit: BoxFit.cover,
-                  path: imagePath,
-                ).flip(isFlip: isFlip),
-              ),
-            if (isActive || imagePath.isNotEmpty)
-              Positioned.fill(
-                child: Container(
-                  decoration: BoxDecoration(
-                    border: Border.all(
-                      color: FlashyBoothColors.pink,
-                      width: isActive ? 3.w : 0,
+                if (isActive || imagePath.isNotEmpty)
+                  Positioned.fill(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                          color: FlashyBoothColors.pink,
+                          width: isActive ? 3.w : 0,
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ),
-            if (imagePath.isNotEmpty)
-              Positioned(
-                top: 8.h,
-                right: 8.w,
-                child: _OrderBadge(value: order),
-              ),
-          ],
+                if (imagePath.isNotEmpty)
+                  Positioned(
+                    top: 8.h,
+                    right: 8.w,
+                    child: _OrderBadge(value: order),
+                  ),
+              ],
+            ),
+          ),
         ),
       ),
     );
