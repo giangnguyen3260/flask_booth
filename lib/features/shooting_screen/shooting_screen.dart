@@ -604,7 +604,9 @@ class _ShootingScreenState extends BasePageState<ShootingScreenListenState,
     }
 
     return LiveBeautyFilter(
-      enabled: !isMockCameraMode && _isBeautyFilterEnabled,
+      enabled: !isMockCameraMode &&
+          _isBeautyFilterEnabled &&
+          appState.isBeautyFilterFeatureEnabled,
       child: preview,
     );
   }

@@ -1,3 +1,4 @@
+import 'package:auto_route/auto_route.dart';
 import 'dart:collection';
 
 import 'package:injectable/injectable.dart';
@@ -109,9 +110,16 @@ class PaymentScreenProvider extends BaseProvider<PaymentScreenListenState> {
       _hasCompletedPayment = true;
       Future.delayed(Duration(milliseconds: 500), () {
         resetBillAcceptor();
-        navigator.replaceAll([BeautyPreviewRoute()]);
+        navigator.replaceAll([_nextAfterPaymentRoute()]);
       });
     }
+  }
+
+  PageRouteInfo _nextAfterPaymentRoute() {
+    if (appState.isBeautyFilterFeatureEnabled) {
+      return BeautyPreviewRoute();
+    }
+    return ShootingGuideRouteRoute();
   }
 
   void resetBillAcceptor() {

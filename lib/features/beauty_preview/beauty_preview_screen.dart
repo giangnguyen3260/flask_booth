@@ -133,6 +133,8 @@ class _BeautyPreviewScreenState extends BasePageState<BeautyPreviewListenState,
                     controller: _controller,
                     isLoading: _isCameraLoading,
                     beautyEnabled: provider.beautyEnabled,
+                    beautyFilterFeatureEnabled:
+                        appState.isBeautyFilterFeatureEnabled,
                   );
 
                   final tools = _BeautyPreviewTools(
@@ -180,11 +182,13 @@ class _BeautyCameraPreview extends StatelessWidget {
     required this.controller,
     required this.isLoading,
     required this.beautyEnabled,
+    required this.beautyFilterFeatureEnabled,
   });
 
   final CameraController? controller;
   final bool isLoading;
   final bool beautyEnabled;
+  final bool beautyFilterFeatureEnabled;
 
   @override
   Widget build(BuildContext context) {
@@ -202,7 +206,7 @@ class _BeautyCameraPreview extends StatelessWidget {
         duration: const Duration(milliseconds: 180),
         child: controller != null && controller!.value.isInitialized
             ? LiveBeautyFilter(
-                enabled: beautyEnabled,
+                enabled: beautyEnabled && beautyFilterFeatureEnabled,
                 child: _BeautyCameraFeed(controller: controller!),
               )
             : _BeautyPreviewPlaceholder(isLoading: isLoading),

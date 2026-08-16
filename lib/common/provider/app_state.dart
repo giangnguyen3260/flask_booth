@@ -1141,6 +1141,60 @@ class AppState extends ChangeNotifier with LogMixin {
         ]);
   }
 
+  bool get isBeautyFilterFeatureEnabled {
+    return _getConfigBoolDefaultTrue(
+      remoteKeys: const [
+        "ENABLE_BEAUTY_FILTER",
+        "BEAUTY_FILTER_ENABLED",
+      ],
+      localKeys: const [
+        "enable_beauty_filter",
+        "ENABLE_BEAUTY_FILTER",
+        "beautyFilterEnabled",
+        "BEAUTY_FILTER_ENABLED",
+      ],
+    );
+  }
+
+  bool _getConfigBoolDefaultTrue({
+    required List<String> remoteKeys,
+    required List<String> localKeys,
+  }) {
+    for (final key in remoteKeys) {
+      final value = getAppConfigValue(key).trim().toLowerCase();
+      if (_isExplicitFalse(value)) {
+        return false;
+      }
+      if (_isExplicitTrue(value)) {
+        return true;
+      }
+    }
+    final localValue = _getLocalConfigValue(localKeys).trim().toLowerCase();
+    if (_isExplicitFalse(localValue)) {
+      return false;
+    }
+    if (_isExplicitTrue(localValue)) {
+      return true;
+    }
+    return true;
+  }
+
+  bool _isExplicitTrue(String value) {
+    return value == "true" ||
+        value == "1" ||
+        value == "y" ||
+        value == "yes" ||
+        value == "on";
+  }
+
+  bool _isExplicitFalse(String value) {
+    return value == "false" ||
+        value == "0" ||
+        value == "n" ||
+        value == "no" ||
+        value == "off";
+  }
+
   bool getAppConfigBool(String configKey) {
     final value = getAppConfigValue(configKey).trim().toLowerCase();
     return value == "true" || value == "1" || value == "y" || value == "yes";
@@ -1217,6 +1271,10 @@ class AppState extends ChangeNotifier with LogMixin {
   }
 
   bool _getLocalConfigBool(List<String> keys) {
+    return _isExplicitTrue(_getLocalConfigValue(keys).toLowerCase());
+  }
+
+  String _getLocalConfigValue(List<String> keys) {
     final values = [
       appConfig,
       _readConfigSection("app"),
@@ -1224,12 +1282,12 @@ class AppState extends ChangeNotifier with LogMixin {
       _readConfigSection("shooting"),
     ];
     for (final section in values) {
-      final value = _readConfigValue(section, keys).toLowerCase();
-      if (value == "true" || value == "1" || value == "y" || value == "yes") {
-        return true;
+      final value = _readConfigValue(section, keys);
+      if (value.isNotEmpty) {
+        return value;
       }
     }
-    return false;
+    return "";
   }
 
   String _lastPathSegment(String value) {
