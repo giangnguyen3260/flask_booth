@@ -1130,7 +1130,15 @@ class AppState extends ChangeNotifier with LogMixin {
   bool get isShotReviewEnabled {
     return getAppConfigBool("ENABLE_SHOT_REVIEW") ||
         getAppConfigBool("SHOT_REVIEW_ENABLED") ||
-        getAppConfigBool("ALLOW_RETAKE_AFTER_SHOT");
+        getAppConfigBool("ALLOW_RETAKE_AFTER_SHOT") ||
+        _getLocalConfigBool(const [
+          "enable_shot_review",
+          "ENABLE_SHOT_REVIEW",
+          "shotReviewEnabled",
+          "SHOT_REVIEW_ENABLED",
+          "allowRetakeAfterShot",
+          "ALLOW_RETAKE_AFTER_SHOT",
+        ]);
   }
 
   bool getAppConfigBool(String configKey) {
@@ -1206,6 +1214,22 @@ class AppState extends ChangeNotifier with LogMixin {
       }
     }
     return "";
+  }
+
+  bool _getLocalConfigBool(List<String> keys) {
+    final values = [
+      appConfig,
+      _readConfigSection("app"),
+      _readConfigSection("features"),
+      _readConfigSection("shooting"),
+    ];
+    for (final section in values) {
+      final value = _readConfigValue(section, keys).toLowerCase();
+      if (value == "true" || value == "1" || value == "y" || value == "yes") {
+        return true;
+      }
+    }
+    return false;
   }
 
   String _lastPathSegment(String value) {

@@ -6,6 +6,7 @@ import 'dart:ui' as ui;
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:project_l/common/constants/beauty_effect.dart';
 import 'package:project_l/common/enums/filter_enum.dart';
 import 'package:project_l/common/extensions/widget_extensions.dart';
 import 'package:project_l/common/log/log_mixin.dart';
@@ -16,7 +17,9 @@ import 'package:project_l/features/background_selection/provider/background_sele
 import 'package:project_l/features/background_selection/provider/background_selection_provider.dart';
 import 'package:project_l/gen/assets.gen.dart';
 import 'package:project_l/remote/models/app_data.dart';
+import 'package:project_l/resources/components/common_image_file.dart';
 import 'package:project_l/resources/components/common_shader_image.dart';
+import 'package:project_l/resources/components/live_beauty_filter.dart';
 import 'package:project_l/resources/flashy_booth_theme.dart';
 import 'package:toastification/toastification.dart';
 
@@ -770,10 +773,7 @@ class _BackgroundSelectionScreenState extends BasePageState<
                         child: SizedBox(
                           width: width,
                           height: height,
-                          child: CommonShaderImage(
-                            effect: provider.effect,
-                            imagePath: imagePath,
-                          ).flip(isFlip: appState.imageParam.isFlipped),
+                          child: _buildEditablePhoto(imagePath),
                         ),
                       ),
                     ),
@@ -782,6 +782,22 @@ class _BackgroundSelectionScreenState extends BasePageState<
         );
       },
     );
+  }
+
+  Widget _buildEditablePhoto(String imagePath) {
+    final isBeautyFilter = BeautyEffect.isEnabled(provider.effect);
+    if (isBeautyFilter) {
+      return LiveBeautyFilter(
+        enabled: true,
+        child: CommonImageFile(
+          path: imagePath,
+        ).flip(isFlip: appState.imageParam.isFlipped),
+      );
+    }
+    return CommonShaderImage(
+      effect: provider.effect,
+      imagePath: imagePath,
+    ).flip(isFlip: appState.imageParam.isFlipped);
   }
 
   Widget _buildBackgroundTools() {
@@ -871,36 +887,14 @@ class _BackgroundSelectionScreenState extends BasePageState<
   }
 
   Widget _buildPrintButton() {
-    return SizedBox(
+    return FlashyBoothPillButton(
+      label: flashyBoothText(context, vi: 'In ảnh', en: 'Print'),
+      subLabel: flashyBoothSecondaryText(context, vi: 'In ảnh', en: 'Print'),
+      onTap: _submitBackgroundSelection,
       width: 230.w,
-      height: 66.h,
-      child: ElevatedButton(
-        onPressed: _submitBackgroundSelection,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: FlashyBoothColors.pink,
-          foregroundColor: Colors.white,
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(999.r),
-          ),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              flashyBoothText(context, vi: 'In \u1ea3nh', en: 'Print'),
-              style: TextStyle(
-                fontFamily: 'Lexend',
-                fontSize: 26.sp,
-                fontWeight: FontWeight.w800,
-                color: Colors.white,
-              ),
-            ),
-            10.horizontalSpace,
-            Icon(Icons.arrow_forward, size: 28.r),
-          ],
-        ),
-      ),
+      height: 76.h,
+      labelSize: 28.sp,
+      subLabelSize: 14.sp,
     );
   }
 
